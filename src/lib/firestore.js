@@ -1,0 +1,355 @@
+import { db } from "$lib/firebase.js";
+import {
+    collection,
+    query,
+    orderBy,
+    where,
+    onSnapshot,
+    addDoc,
+    setDoc,
+    doc,
+    updateDoc,
+    getDoc,
+    getDocs,
+    runTransaction,
+    limit,
+} from "firebase/firestore";
+
+const ensureDb = () => {
+    if (!db) {
+        throw new Error("Firestore no está inicializado. Ejecuta la app en el navegador y asegúrate de que Firebase esté configurado.");
+    }
+};
+
+const collectionRef = (collectionName) => {
+    ensureDb();
+    return collection(db, collectionName);
+};
+
+const collectionQuery = (collectionName, orderField = "fecha") => {
+    return query(collectionRef(collectionName), orderBy(orderField, "desc"));
+};
+
+export const watchCollection = (collectionName, callback, orderField = "fecha") => {
+    const q = collectionQuery(collectionName, orderField);
+    return onSnapshot(q, (snapshot) => {
+        callback(
+            snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+        );
+    });
+};
+
+export const getCollectionOnce = async (collectionName, orderField = "fecha") => {
+    const q = collectionQuery(collectionName, orderField);
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+};
+
+export const getDocumentsWhere = async (collectionName, field, op, value, orderField = "fecha") => {
+    ensureDb();
+    const q = query(
+        collectionRef(collectionName),
+        where(field, op, value),
+        orderBy(orderField, "desc"),
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+};
+
+export const getDocumentByField = async (collectionName, field, op, value) => {
+    const docs = await getDocumentsWhere(collectionName, field, op, value);
+    return docs.length ? docs[0] : null;
+};
+
+export const saveDocument = async (collectionName, payload) => {
+    if (!payload.id) {
+        const docRef = await addDoc(collectionRef(collectionName), {
+            ...payload,
+            fecha: payload.fecha || new Date().toISOString(),
+        });
+        return { ...payload, id: docRef.id };
+    }
+
+    const ref = doc(db, collectionName, payload.id);
+    await setDoc(ref, payload, { merge: true });
+    return payload;
+};
+
+export const updateDocument = async (collectionName, id, updates) => {
+    const ref = doc(db, collectionName, id);
+    await updateDoc(ref, updates);
+};
+
+export const getDocument = async (collectionName, id) => {
+    const ref = doc(db, collectionName, id);
+    const snapshot = await getDoc(ref);
+    return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
+};
+
+// ─── Cliente Profile ────────────────────────────────────────────────────────
+
+export const getClienteProfile = async (uid) => {
+    ensureDb();
+    const ref = doc(db, "clientes", uid);
+    const snap = await getDoc(ref);
+    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+};
+
+export const isProfileComplete = (profile) => {
+    return !!(profile && profile.nombre && profile.apellido && profile.direccion);
+};
+
+export const saveClienteProfile = async (uid, profileData) => {
+    ensureDb();
+    const ref = doc(db, "clientes", uid);
+    const now = new Date().toISOString();
+    await setDoc(ref, { ...profileData, uid, updatedAt: now }, { merge: true });
+    return { id: uid, uid, ...profileData };
+};
+
+export const updateClienteProfile = async (uid, updates) => {
+    ensureDb();
+    const ref = doc(db, "clientes", uid);
+    const snap = await getDoc(ref);
+    const existing = snap.exists() ? snap.data() : {};
+
+    // Registro de cambios
+    const changeLog = Array.isArray(existing.changeLog) ? [...existing.changeLog] : [];
+    const changed = {};
+    for (const key of Object.keys(updates)) {
+        if (existing[key] !== undefined && existing[key] !== updates[key]) {
+            changed[key] = { from: existing[key], to: updates[key] };
+        }
+    }
+    if (Object.keys(changed).length > 0) {
+        changeLog.push({ cambios: changed, at: new Date().toISOString() });
+    }
+
+    await updateDoc(ref, { ...updates, changeLog, updatedAt: new Date().toISOString() });
+};
+
+// ─── Contador de pedidos (número secuencial) ─────────────────────────────────
+
+export const getNextPedidoNumber = async () => {
+    ensureDb();
+    const counterRef = doc(db, "config", "pedidos_counter");
+    let nextNumber = 1001;
+    await runTransaction(db, async (transaction) => {
+        const snap = await transaction.get(counterRef);
+        if (snap.exists()) {
+            nextNumber = (snap.data().last || 1000) + 1;
+        }
+        transaction.set(counterRef, { last: nextNumber });
+    });
+    return nextNumber;
+};
+
+// ─── Pedidos + Facturas ───────────────────────────────────────────────────────
+
+/**
+ * Crea un pedido en Firestore y genera su factura automáticamente.
+ * Si el método de pago es transferencia, la factura se aprueba automáticamente.
+ */
+export const crearPedidoConFactura = async (pedidoData, productosMap) => {
+    ensureDb();
+
+    const numero = await getNextPedidoNumber();
+    const fecha = new Date().toISOString();
+
+    // Calcular total
+    const items = pedidoData.items || [];
+    const total = items.reduce((sum, it) => {
+        const prod = productosMap[it.productId];
+        return sum + (prod?.precio || 0) * (Number(it.cantidad) || 0);
+    }, 0);
+
+    const pedidoRecord = {
+        ...pedidoData,
+        numero,
+        fecha,
+        estado: pedidoData.estado || "Preparando",
+        history: [{ from: null, to: pedidoData.estado || "Preparando", at: fecha }],
+        total,
+    };
+
+    // Crear el pedido
+    const pedidoRef = await addDoc(collectionRef("pedidos"), pedidoRecord);
+    const pedidoId = pedidoRef.id;
+
+    // Estado de la factura según método de pago
+    const estadoFactura =
+        pedidoData.metodoPago === "transferencia" ? "aprobada" : "pendiente";
+
+    const facturaRecord = {
+        pedidoId,
+        numero,
+        clienteId: pedidoData.clienteId,
+        items,
+        monto: total,
+        metodoPago: pedidoData.metodoPago || "contra_entrega",
+        estado: estadoFactura,
+        notas: pedidoData.notas || "",
+        fecha,
+    };
+
+    await addDoc(collectionRef("facturas"), facturaRecord);
+
+    return { id: pedidoId, ...pedidoRecord };
+};
+
+export const changeOrderStatus = async (orderId, newStatus, extraData = {}) => {
+    ensureDb();
+    const orderRef = doc(db, "pedidos", orderId);
+
+    await runTransaction(db, async (transaction) => {
+        const orderSnap = await transaction.get(orderRef);
+        if (!orderSnap.exists()) throw new Error("Pedido no encontrado");
+
+        const order = orderSnap.data();
+        const prevStatus = order.estado || null;
+        const items = order.items || [];
+
+        // Decrease stock when moving to Empacado (only once)
+        if (newStatus === "Empacado" && prevStatus !== "Empacado") {
+            for (const it of items) {
+                const prodRef = doc(db, "productos", it.productId);
+                const prodSnap = await transaction.get(prodRef);
+                if (!prodSnap.exists()) throw new Error("Producto del pedido no existe");
+                const currentStock = Number(prodSnap.data().stock) || 0;
+                const newStock = currentStock - (Number(it.cantidad) || 0);
+                transaction.update(prodRef, { stock: newStock });
+                if (newStock <= 0) transaction.update(prodRef, { estado: "agotado" });
+            }
+        }
+
+        // Restore stock when canceling an already-empacado pedido
+        if (newStatus === "Cancelado" && prevStatus === "Empacado") {
+            for (const it of items) {
+                const prodRef = doc(db, "productos", it.productId);
+                const prodSnap = await transaction.get(prodRef);
+                const currentStock = Number(prodSnap.data().stock) || 0;
+                const newStock = currentStock + (Number(it.cantidad) || 0);
+                transaction.update(prodRef, { stock: newStock });
+                if (newStock > 0 && prodSnap.data().estado === "agotado")
+                    transaction.update(prodRef, { estado: "disponible" });
+            }
+        }
+
+        // Update order status and append history
+        const history = Array.isArray(order.history) ? [...order.history] : [];
+        history.push({ from: prevStatus, to: newStatus, at: new Date().toISOString() });
+        
+        const updates = { estado: newStatus, history };
+        if (extraData.fotoEntrega) updates.fotoEntrega = extraData.fotoEntrega;
+        
+        transaction.update(orderRef, updates);
+    });
+
+    // Sync factura state when order is cancelled
+    if (newStatus === "Cancelado") {
+        try {
+            const q = query(collectionRef("facturas"), where("pedidoId", "==", orderId));
+            const snap = await getDocs(q);
+            for (const d of snap.docs) {
+                await updateDoc(d.ref, { estado: "cancelada" });
+            }
+        } catch (e) {
+            console.warn("No se pudo cancelar factura:", e);
+        }
+    }
+
+    // Sync factura when delivered & paid (contra entrega)
+    if (newStatus === "Entregado") {
+        try {
+            const orderSnap2 = await getDoc(orderRef);
+            if (orderSnap2.exists() && orderSnap2.data().metodoPago === "contra_entrega") {
+                const q = query(collectionRef("facturas"), where("pedidoId", "==", orderId));
+                const snap = await getDocs(q);
+                for (const d of snap.docs) {
+                    await updateDoc(d.ref, { estado: "pendiente_pago" });
+                }
+            }
+        } catch (e) {
+            console.warn("No se pudo actualizar factura:", e);
+        }
+    }
+};
+
+export const adjustProductStock = async (productId, delta) => {
+    ensureDb();
+    const prodRef = doc(db, "productos", productId);
+    await runTransaction(db, async (transaction) => {
+        const snap = await transaction.get(prodRef);
+        if (!snap.exists()) throw new Error("Producto no encontrado");
+        const current = Number(snap.data().stock) || 0;
+        const next = current + Number(delta || 0);
+        transaction.update(prodRef, { stock: next });
+        if (next <= 0) transaction.update(prodRef, { estado: "agotado" });
+        else if (snap.data().estado === "agotado" && next > 0)
+            transaction.update(prodRef, { estado: "disponible" });
+    });
+};
+
+// ─── Egresos ─────────────────────────────────────────────────────────────────
+
+export const saveEgreso = async (data) => {
+    ensureDb();
+    const record = {
+        detalle: data.detalle || "",
+        monto: Number(data.monto) || 0,
+        fecha: data.fecha || new Date().toISOString(),
+        eliminado: false,
+    };
+    const ref = await addDoc(collectionRef("egresos"), record);
+    return { id: ref.id, ...record };
+};
+
+export const softDeleteEgreso = async (id) => {
+    await updateDocument("egresos", id, { eliminado: true });
+};
+
+export const restoreEgreso = async (id) => {
+    await updateDocument("egresos", id, { eliminado: false });
+};
+
+// ─── Facturas ─────────────────────────────────────────────────────────────────
+
+export const aprobarFactura = async (id) => {
+    await updateDocument("facturas", id, { estado: "aprobada", aprobadaAt: new Date().toISOString() });
+};
+
+export const cancelarFactura = async (id) => {
+    await updateDocument("facturas", id, { estado: "cancelada", canceladaAt: new Date().toISOString() });
+};
+
+// ─── Metas de Fidelidad ──────────────────────────────────────────────────────
+
+export const saveMeta = async (metaData) => {
+    ensureDb();
+    const record = {
+        ...metaData,
+        activa: true,
+        fecha: new Date().toISOString(),
+    };
+    const ref = await addDoc(collectionRef("metas"), record);
+    return { id: ref.id, ...record };
+};
+
+export const eliminarMeta = async (id, clientesAlcanzaron = []) => {
+    ensureDb();
+    const metaRef = doc(db, "metas", id);
+    const snap = await getDoc(metaRef);
+    if (!snap.exists()) return;
+
+    const meta = snap.data();
+
+    // Archivar en historial
+    await addDoc(collectionRef("metas_historial"), {
+        ...meta,
+        clientesAlcanzaron,
+        archivedAt: new Date().toISOString(),
+    });
+
+    // Marcar como inactiva
+    await updateDoc(metaRef, { activa: false });
+};
