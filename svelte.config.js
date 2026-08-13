@@ -1,6 +1,6 @@
 // svelte.config.js
 import adapterStatic from '@sveltejs/adapter-static';
-import adapterAuto from '@sveltejs/adapter-auto';
+import adapterVercel from '@sveltejs/adapter-vercel';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 const useStatic = process.env.ADAPTER === 'static';
@@ -10,6 +10,6 @@ export default {
     kit: {
         adapter: useStatic
             ? adapterStatic({ pages: 'build', assets: 'build', fallback: 'index.html' })
-            : adapterAuto()
+            : adapterVercel()
     }
 };
