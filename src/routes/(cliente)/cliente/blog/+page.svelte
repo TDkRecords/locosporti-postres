@@ -15,14 +15,15 @@
             }
 
             const html = await response.text();
-            const titulos = [...html.matchAll(/<h[1-3][^>]*>(.*?)<\/h[1-3]>/gi)].map(
-                (match) => match[1].replace(/<[^>]+>/g, "").trim(),
-            );
+            const titulos = [
+                ...html.matchAll(/<h[1-3][^>]*>(.*?)<\/h[1-3]>/gi),
+            ].map((match) => match[1].replace(/<[^>]+>/g, "").trim());
 
             posts = titulos.slice(0, 6).map((title, index) => ({
                 id: index + 1,
                 title,
-                excerpt: "Actualización publicada en la landing oficial del negocio.",
+                excerpt:
+                    "Actualización publicada en la landing oficial del negocio.",
                 tags: ["Landing", "Actualización"],
             }));
 
@@ -34,6 +35,7 @@
             error =
                 "No pudimos cargar el blog desde la landing. Mostramos contenido de ejemplo.";
             posts = [
+                /* 
                 {
                     id: 1,
                     title: "Próximo stock de brownies",
@@ -46,6 +48,7 @@
                     excerpt: "Consulta los cambios en tiempos y cobertura.",
                     tags: ["Política", "Domicilios"],
                 },
+             */
             ];
         } finally {
             loading = false;
@@ -64,7 +67,9 @@
         >
             Blog
         </p>
-        <h1 class="mt-2 text-3xl font-bold text-gray-900">Actualizaciones del emprendimiento</h1>
+        <h1 class="mt-2 text-3xl font-bold text-gray-900">
+            Noticias sobre Locos por ti
+        </h1>
         <p class="mt-2 text-sm text-gray-500">
             Las novedades se consultan desde
             <a
@@ -82,7 +87,11 @@
         </div>
     {:else}
         {#if error}
-            <p class="rounded-2xl bg-[#FFE28A]/60 px-4 py-3 text-sm text-gray-700">{error}</p>
+            <p
+                class="rounded-2xl bg-[#FFE28A]/60 px-4 py-3 text-sm text-gray-700"
+            >
+                {error}
+            </p>
         {/if}
 
         <section class="grid gap-4 lg:grid-cols-2">
@@ -91,14 +100,18 @@
                     class="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                 >
                     <div class="flex items-center justify-between gap-3">
-                        <h2 class="text-xl font-bold text-gray-900">{post.title}</h2>
+                        <h2 class="text-xl font-bold text-gray-900">
+                            {post.title}
+                        </h2>
                         <span
                             class="rounded-full bg-[#FFFB96]/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-gray-700"
                         >
                             Post
                         </span>
                     </div>
-                    <p class="mt-4 text-sm leading-6 text-gray-600">{post.excerpt}</p>
+                    <p class="mt-4 text-sm leading-6 text-gray-600">
+                        {post.excerpt}
+                    </p>
                     <div class="mt-5 flex flex-wrap gap-2">
                         {#each post.tags as tag}
                             <span

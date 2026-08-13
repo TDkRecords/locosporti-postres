@@ -8,12 +8,12 @@
             href: "/cliente/home",
             icon: "fa-solid fa-house",
         },
-        {
+        /* {
             name: "Blog",
             shortName: "Blog",
             href: "/cliente/blog",
             icon: "fa-solid fa-newspaper",
-        },
+        }, */
         {
             name: "Fidelidad",
             shortName: "Fidelidad",
@@ -29,7 +29,10 @@
     ];
 
     function isActive(href) {
-        return $page.url.pathname === href || $page.url.pathname.startsWith(`${href}/`);
+        return (
+            $page.url.pathname === href ||
+            $page.url.pathname.startsWith(`${href}/`)
+        );
     }
 </script>
 

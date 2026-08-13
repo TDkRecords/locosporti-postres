@@ -3,11 +3,13 @@
  * @param {File} file
  * @returns {Promise<string>} URL segura de la imagen
  */
+import { API_BASE } from "$lib/config.js";
+
 export async function uploadImage(file) {
     const formData = new FormData();
     formData.append("file", file);
 
-    const response = await fetch("/api/upload", {
+    const response = await fetch(`${API_BASE}/api/upload`, {
         method: "POST",
         body: formData,
     });

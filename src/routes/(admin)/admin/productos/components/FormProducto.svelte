@@ -18,10 +18,18 @@
     let isEditing = $derived(Boolean(producto));
     let uploadingImage = $state(false);
 
-    let ingresosTotales = $derived((Number(form.precio) || 0) * (Number(form.stock) || 0));
+    let ingresosTotales = $derived(
+        (Number(form.precio) || 0) * (Number(form.stock) || 0),
+    );
     let costoTotal = $derived(Number(form.costo) || 0);
     let ganancia = $derived(ingresosTotales - costoTotal);
-    let rentabilidad = $derived(costoTotal > 0 ? (ganancia / costoTotal) * 100 : (ingresosTotales > 0 ? 100 : 0));
+    let rentabilidad = $derived(
+        costoTotal > 0
+            ? (ganancia / costoTotal) * 100
+            : ingresosTotales > 0
+              ? 100
+              : 0,
+    );
 
     function resetForm() {
         form = {
@@ -123,7 +131,10 @@
 
                     <!-- Imagen -->
                     <div>
-                        <label class="mb-2 block text-sm font-semibold text-gray-700">
+                        <label
+                            for="imagen"
+                            class="mb-2 block text-sm font-semibold text-gray-700"
+                        >
                             Imagen del producto
                         </label>
                         <div class="flex items-center gap-4">
@@ -134,7 +145,9 @@
                                     class="h-20 w-20 rounded-2xl object-cover border border-gray-200"
                                 />
                             {:else}
-                                <div class="flex h-20 w-20 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
+                                <div
+                                    class="flex h-20 w-20 items-center justify-center rounded-2xl bg-gray-100 text-gray-400"
+                                >
                                     <i class="fa-regular fa-image text-2xl"></i>
                                 </div>
                             {/if}
@@ -147,7 +160,11 @@
                                     class="w-full text-sm text-gray-500 file:mr-4 file:rounded-2xl file:border-0 file:bg-[#CDB9FE]/30 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#7c4dff] hover:file:bg-[#CDB9FE]/50"
                                 />
                                 {#if uploadingImage}
-                                    <p class="mt-2 text-xs font-semibold text-blue-600">Subiendo imagen...</p>
+                                    <p
+                                        class="mt-2 text-xs font-semibold text-blue-600"
+                                    >
+                                        Subiendo imagen...
+                                    </p>
                                 {/if}
                             </div>
                         </div>
@@ -335,7 +352,7 @@
                         <button
                             type="submit"
                             disabled={uploadingImage}
-                            class="rounded-2xl bg-[#CDB9FE] px-6 py-3 font-semibold text-gray-800 shadow-lg transition-all duration-200 hover:-translate-y-1 hover:bg-[#bfa3fd] hover:shadow-xl active:scale-95 disabled:opacity-70 disabled:hover:-translate-y-0"
+                            class="rounded-2xl bg-[#CDB9FE] px-6 py-3 font-semibold text-gray-800 shadow-lg transition-all duration-200 hover:-translate-y-1 hover:bg-[#bfa3fd] hover:shadow-xl active:scale-95 disabled:opacity-70 disabled:hover:translate-y-0"
                         >
                             {isEditing
                                 ? "Actualizar producto"

@@ -1,3 +1,4 @@
+import { PUBLIC_FIREBASE_API_KEY } from "$env/static/public";
 import { browser } from "$app/environment";
 import { initializeApp } from "firebase/app";
 import {
@@ -10,8 +11,9 @@ import {
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
+
 const firebaseConfig = {
-    apiKey: "AIzaSyAdg0rHjv7tdItRacFaIMXEbKVww-tOBrk",
+    apiKey: PUBLIC_FIREBASE_API_KEY,
     authDomain: "locosporti-ba83d.firebaseapp.com",
     projectId: "locosporti-ba83d",
     storageBucket: "locosporti-ba83d.firebasestorage.app",

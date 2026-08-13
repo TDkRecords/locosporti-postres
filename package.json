@@ -4,16 +4,21 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"dev": "vite dev",
+		"dev:admin": "vite dev --mode admin",
+		"dev:cliente": "vite dev --mode cliente",
 		"build": "vite build",
+		"build:admin": "cross-env ADAPTER=static node scripts/prepare-target.mjs admin && cross-env ADAPTER=static vite build --mode admin && node scripts/prepare-target.mjs restore",
+		"build:cliente": "cross-env ADAPTER=static node scripts/prepare-target.mjs cliente && cross-env ADAPTER=static vite build --mode cliente && node scripts/prepare-target.mjs restore",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^7.0.1",
+		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.63.0",
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",
 		"@tailwindcss/vite": "^4.3.0",
+		"cross-env": "^10.1.0",
 		"svelte": "^5.56.1",
 		"tailwindcss": "^4.3.0",
 		"vite": "^8.0.16"
