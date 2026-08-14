@@ -1,5 +1,6 @@
 <script>
     import { signInAdminWithEmail } from "$lib/firebase.js";
+    import { currentUser } from "$lib/stores.js";
     import { goto } from "$app/navigation";
 
     let usuario = $state("");
@@ -7,6 +8,10 @@
     let mostrarPassword = $state(false);
     let loading = $state(false);
     let error = $state("");
+
+    $effect(() => {
+        if ($currentUser) goto("/admin");
+    });
 
     async function handleSubmit(event) {
         event.preventDefault();
@@ -41,9 +46,7 @@
                     <i class="fa-solid fa-user text-3xl text-gray-800"></i>
                 </div>
 
-                <h1 class="text-3xl font-bold text-gray-800">
-                    Locos por ti
-                </h1>
+                <h1 class="text-3xl font-bold text-gray-800">Locos por ti</h1>
                 <p class="mt-2 text-sm text-gray-500">
                     Accede con tus credenciales de administrador.
                 </p>

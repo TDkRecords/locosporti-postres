@@ -40,42 +40,60 @@
 </svelte:head>
 
 <div class="px-4 py-10 pt-[10vh] text-gray-900">
-    <div class="mx-auto max-w-xl rounded-4xl border border-white/60 bg-white/95 p-8 shadow-2xl backdrop-blur-sm">
+    <div
+        class="mx-auto max-w-xl rounded-4xl border border-white/60 bg-white/95 p-8 shadow-2xl backdrop-blur-sm"
+    >
         <div class="mb-8 text-center">
-            <div class="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-3xl bg-[#CDB9FE] text-3xl text-gray-800">
+            <div
+                class="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-3xl bg-[#CDB9FE] text-3xl text-gray-800"
+            >
                 <i class="fa-solid fa-heart"></i>
             </div>
             <h1 class="text-4xl font-bold">Locos por ti</h1>
             <p class="mt-3 text-sm text-gray-600">
-                Inicia sesión con Google para continuar y acceder al catálogo de postres.
+                Inicia sesión con Google para continuar y acceder al catálogo de
+                postres.
             </p>
         </div>
 
-        <button
-            type="button"
-            class="flex w-full items-center justify-center gap-3 rounded-3xl bg-black px-5 py-4 text-white transition hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-70"
-            onclick={handleGoogle}
-            disabled={loading}
-        >
-            <i class="fa-brands fa-google text-xl"></i>
-            {#if loading}
-                Autenticando...
-            {:else}
-                Iniciar sesión con Google
-            {/if}
-        </button>
+        {#if $currentUser === undefined || ($currentUser && $clientProfile === undefined)}
+            <div class="flex min-h-[60vh] items-center justify-center">
+                <i class="fa-solid fa-spinner fa-spin text-3xl text-gray-400"
+                ></i>
+            </div>
+        {:else}
+            <button
+                type="button"
+                class="flex w-full items-center justify-center gap-3 rounded-3xl bg-black px-5 py-4 text-white transition hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-70"
+                onclick={handleGoogle}
+                disabled={loading}
+            >
+                <i class="fa-brands fa-google text-xl"></i>
+                {#if loading}
+                    Autenticando...
+                {:else}
+                    Iniciar sesión con Google
+                {/if}
+            </button>
+        {/if}
 
         {#if error}
-            <p class="mt-5 rounded-2xl bg-red-100 px-4 py-3 text-sm text-red-700">
+            <p
+                class="mt-5 rounded-2xl bg-red-100 px-4 py-3 text-sm text-red-700"
+            >
                 {error}
             </p>
         {/if}
 
         <div class="mt-8 text-center text-sm text-gray-500">
             Al ingresar aceptas nuestros
-            <a class="underline" href="/terminos" rel="noopener">Términos de Servicio</a>
+            <a class="underline" href="/terminos" rel="noopener"
+                >Términos de Servicio</a
+            >
             y
-            <a class="underline" href="/privacidad" rel="noopener">Política de Privacidad</a>.
+            <a class="underline" href="/privacidad" rel="noopener"
+                >Política de Privacidad</a
+            >.
         </div>
     </div>
 </div>

@@ -24,11 +24,25 @@ const firebaseConfig = {
     appId: "1:561979279173:web:4b2fe6aebc512052f5e02c",
 };
 
+let googleAuthInitPromise = null;
+
 const app = initializeApp(firebaseConfig);
 
 export const auth = browser ? getAuth(app) : null;
 export const db = browser ? getFirestore(app) : null;
 export const googleAuthProvider = new GoogleAuthProvider();
+
+const ensureGoogleAuthInitialized = () => {
+    if (!googleAuthInitPromise) {
+        googleAuthInitPromise = GoogleAuth.initialize({
+            clientId: "561979279173-bo6ig9enek4apmks0g0gqun1ni3mf1av.apps.googleusercontent.com",
+            scopes: ["profile", "email"],
+            // sin grantOfflineAccess: no usamos serverAuthCode y solo añadía
+            // un paso extra de consentimiento que ralentizaba el login
+        });
+    }
+    return googleAuthInitPromise;
+};
 
 export const signInWithGoogle = async () => {
     if (!browser) {
@@ -38,6 +52,7 @@ export const signInWithGoogle = async () => {
     // Android (Capacitor)
     if (Capacitor.isNativePlatform()) {
         try {
+            await ensureGoogleAuthInitialized();
             const googleUser = await GoogleAuth.signIn();
 
             if (!googleUser.authentication?.idToken) {
@@ -61,6 +76,8 @@ export const signInWithGoogle = async () => {
     const result = await signInWithPopup(auth, googleAuthProvider);
     return result.user;
 };
+
+export { ensureGoogleAuthInitialized };
 
 export const signInAdminWithEmail = async (email, password) => {
     if (!browser) throw new Error("Firebase auth solo está disponible en el navegador.");
