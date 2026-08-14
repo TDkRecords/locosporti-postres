@@ -39,6 +39,18 @@ export const watchCollection = (collectionName, callback, orderField = "fecha") 
     });
 };
 
+export const watchCollectionWhere = (collectionName, field, op, value, callback, orderField = "fecha") => {
+    ensureDb();
+    const q = query(
+        collectionRef(collectionName),
+        where(field, op, value),
+        orderBy(orderField, "desc"),
+    );
+    return onSnapshot(q, (snapshot) => {
+        callback(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    });
+};
+
 export const getCollectionOnce = async (collectionName, orderField = "fecha") => {
     const q = collectionQuery(collectionName, orderField);
     const snapshot = await getDocs(q);
@@ -238,10 +250,10 @@ export const changeOrderStatus = async (orderId, newStatus, extraData = {}) => {
         // Update order status and append history
         const history = Array.isArray(order.history) ? [...order.history] : [];
         history.push({ from: prevStatus, to: newStatus, at: new Date().toISOString() });
-        
+
         const updates = { estado: newStatus, history };
         if (extraData.fotoEntrega) updates.fotoEntrega = extraData.fotoEntrega;
-        
+
         transaction.update(orderRef, updates);
     });
 
