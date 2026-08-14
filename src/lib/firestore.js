@@ -96,7 +96,7 @@ export const getClienteProfile = async (uid) => {
 };
 
 export const isProfileComplete = (profile) => {
-    return !!(profile && profile.nombre && profile.apellido && profile.direccion);
+    return !!(profile && profile.nombre && profile.apellido && profile.direccion && profile.telefono);
 };
 
 export const saveClienteProfile = async (uid, profileData) => {

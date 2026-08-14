@@ -1,0 +1,6 @@
+/build/*
+!/build/.npmkeep
+
+# Android signing keys
+android/keystores/
+android/keystore.properties

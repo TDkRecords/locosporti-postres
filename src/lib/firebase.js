@@ -8,8 +8,11 @@ import {
     signInWithEmailAndPassword,
     signOut,
     onAuthStateChanged,
+    signInWithCredential,
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { Capacitor } from "@capacitor/core";
+import { GoogleAuth } from "@codetrix-studio/capacitor-google-auth";
 
 
 const firebaseConfig = {
@@ -28,7 +31,33 @@ export const db = browser ? getFirestore(app) : null;
 export const googleAuthProvider = new GoogleAuthProvider();
 
 export const signInWithGoogle = async () => {
-    if (!browser) throw new Error("Firebase auth solo está disponible en el navegador.");
+    if (!browser) {
+        throw new Error("Firebase auth solo está disponible en el navegador.");
+    }
+
+    // Android (Capacitor)
+    if (Capacitor.isNativePlatform()) {
+        try {
+            const googleUser = await GoogleAuth.signIn();
+
+            if (!googleUser.authentication?.idToken) {
+                throw new Error("Google no devolvió un ID Token.");
+            }
+
+            const credential = GoogleAuthProvider.credential(
+                googleUser.authentication.idToken
+            );
+
+            const userCredential = await signInWithCredential(auth, credential);
+
+            return userCredential.user;
+        } catch (error) {
+            console.error("Error al iniciar sesión con Google en Android:", error);
+            throw error;
+        }
+    }
+
+    // Web
     const result = await signInWithPopup(auth, googleAuthProvider);
     return result.user;
 };

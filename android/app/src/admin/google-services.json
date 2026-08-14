@@ -1,0 +1,76 @@
+{
+  "project_info": {
+    "project_number": "561979279173",
+    "project_id": "locosporti-ba83d",
+    "storage_bucket": "locosporti-ba83d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:561979279173:android:78f44eeccafcfaebf5e02c",
+        "android_client_info": {
+          "package_name": "com.locosporti.admin"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "561979279173-bo6ig9enek4apmks0g0gqun1ni3mf1av.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA6wAbzYV7WDfqzPk5c-v0Hb0zhDsubHaA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "561979279173-bo6ig9enek4apmks0g0gqun1ni3mf1av.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:561979279173:android:91146acfb6d6099ff5e02c",
+        "android_client_info": {
+          "package_name": "com.locosporti.cliente"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "561979279173-ivjmmonts65aq0pp2ui550g4ape6v47g.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.locosporti.cliente",
+            "certificate_hash": "a8754b3ee3bdd3636e554a1336d86586c1409dc0"
+          }
+        },
+        {
+          "client_id": "561979279173-bo6ig9enek4apmks0g0gqun1ni3mf1av.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA6wAbzYV7WDfqzPk5c-v0Hb0zhDsubHaA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "561979279173-bo6ig9enek4apmks0g0gqun1ni3mf1av.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -2,6 +2,7 @@
     import { currentUser, clientProfile } from "$lib/stores.js";
     import { goto } from "$app/navigation";
     import { saveClienteProfile, isProfileComplete } from "$lib/firestore.js";
+    import { signOutFirebase } from "$lib/firebase.js";
 
     let paso = $state(1);
 
@@ -14,6 +15,7 @@
     let complemento = $state("");
     let tipoVivienda = $state("");
     let sugerencias = $state("");
+    let telefono = $state("");
 
     let aceptaTerminos = $state(false);
     let error = $state("");
@@ -58,12 +60,27 @@
         if (paso > 1) paso -= 1;
     }
 
+    async function cambiarCuenta() {
+        try {
+            await signOutFirebase();
+            goto("/");
+        } catch (err) {
+            console.error(err);
+            error = "Error al cambiar de cuenta.";
+        }
+    }
+
     async function completarRegistro(event) {
         event.preventDefault();
         error = "";
 
         if (!aceptaTerminos) {
             error = "Debes aceptar los términos, condiciones y tratamiento de datos.";
+            return;
+        }
+
+        if (!telefono.trim()) {
+            error = "Debes ingresar tu número de teléfono / WhatsApp.";
             return;
         }
 
@@ -88,6 +105,7 @@
                 complemento: complemento.trim(),
                 tipoVivienda: tipoVivienda.trim(),
                 sugerencias: sugerencias.trim(),
+                telefono: telefono.trim(),
                 estado: "activo",
                 createdAt: new Date().toISOString(),
                 changeLog: [],
@@ -184,6 +202,13 @@
                 >
                     Siguiente
                 </button>
+                <button
+                    type="button"
+                    onclick={cambiarCuenta}
+                    class="w-full rounded-2xl border border-gray-200 px-4 py-3 font-semibold text-gray-700 transition hover:bg-gray-50 mt-2"
+                >
+                    Cambiar de cuenta
+                </button>
             </form>
         {:else if paso === 2}
             <form
@@ -279,6 +304,19 @@
             </form>
         {:else}
             <form class="space-y-4" onsubmit={completarRegistro}>
+                <div>
+                    <label for="telefono" class="mb-2 block text-sm font-semibold text-gray-700">
+                        Teléfono / WhatsApp
+                    </label>
+                    <input
+                        id="telefono"
+                        bind:value={telefono}
+                        type="tel"
+                        placeholder="Ej: 300 123 4567"
+                        class="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-[#CDB9FE] focus:ring-4 focus:ring-[#CDB9FE]/20"
+                    />
+                </div>
+
                 <div class="rounded-2xl bg-[#FFFB96]/60 p-4 text-sm text-gray-700">
                     <p class="font-semibold">Dirección registrada:</p>
                     <p class="mt-2">
