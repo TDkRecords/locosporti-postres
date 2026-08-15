@@ -8,6 +8,13 @@
             href: "/cliente/home",
             icon: "fa-solid fa-house",
         },
+
+        {
+            name: "Pedidos",
+            shortName: "Pedidos",
+            href: "/cliente/pedidos",
+            icon: "fa-solid fa-shopping-cart",
+        },
         /* {
             name: "Blog",
             shortName: "Blog",
