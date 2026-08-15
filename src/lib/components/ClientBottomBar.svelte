@@ -6,14 +6,14 @@
             name: "Home",
             shortName: "Home",
             href: "/cliente/home",
-            icon: "fa-solid fa-house",
+            icon: "fa-solid fa-shop",
         },
 
         {
             name: "Pedidos",
             shortName: "Pedidos",
             href: "/cliente/pedidos",
-            icon: "fa-solid fa-shopping-cart",
+            icon: "fa-solid fa-bag-shopping",
         },
         /* {
             name: "Blog",
