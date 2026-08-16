@@ -18,18 +18,30 @@
     let unsubClientes, unsubMetas, unsubHistorial;
 
     onMount(() => {
-        unsubClientes = watchCollection("clientes", (data) => {
-            clientes = data.filter((c) => c.estado !== "eliminado");
-            loading = false;
-        }, "createdAt");
+        unsubClientes = watchCollection(
+            "clientes",
+            (data) => {
+                clientes = data.filter((c) => c.estado !== "eliminado");
+                loading = false;
+            },
+            "createdAt",
+        );
 
-        unsubMetas = watchCollection("metas", (data) => {
-            metas = data;
-        }, "fecha");
+        unsubMetas = watchCollection(
+            "metas",
+            (data) => {
+                metas = data;
+            },
+            "fecha",
+        );
 
-        unsubHistorial = watchCollection("metas_historial", (data) => {
-            historialMetas = data;
-        }, "archivedAt");
+        unsubHistorial = watchCollection(
+            "metas_historial",
+            (data) => {
+                historialMetas = data;
+            },
+            "archivedAt",
+        );
 
         return () => {
             unsubClientes?.();
@@ -43,9 +55,13 @@
     let pedidos = $state([]);
     let unsubPedidos;
     onMount(() => {
-        unsubPedidos = watchCollection("pedidos", (data) => {
-            pedidos = data;
-        }, "fecha");
+        unsubPedidos = watchCollection(
+            "pedidos",
+            (data) => {
+                pedidos = data;
+            },
+            "fecha",
+        );
         return () => unsubPedidos?.();
     });
 
@@ -55,10 +71,39 @@
         ).length;
     }
 
+    // Suma la cantidad de productos (no de pedidos) de un pedido entregado.
+    // Un pedido con varios productos, o con cantidades > 1, cuenta cada
+    // unidad, no solo "1 por pedido".
+    function contarProductos(pedido) {
+        return (pedido.items || []).reduce(
+            (sum, it) => sum + (Number(it.cantidad) || 0),
+            0,
+        );
+    }
+
+    // Cuenta solo los productos entregados mientras la meta estuvo activa:
+    // desde que se creó la meta (meta.fecha) hasta su caducidad (si tiene).
+    // Así los pedidos anteriores a la meta no cuentan para el progreso.
+    function getProductosEntregadosParaMeta(clienteId, meta) {
+        const inicio = meta.fecha ? new Date(meta.fecha) : null;
+        const fin = meta.caducidad ? new Date(meta.caducidad) : null;
+        return pedidos
+            .filter((p) => {
+                if (p.clienteId !== clienteId || p.estado !== "Entregado")
+                    return false;
+                const fechaPedido = p.fecha ? new Date(p.fecha) : null;
+                if (!fechaPedido) return false;
+                if (inicio && fechaPedido < inicio) return false;
+                if (fin && fechaPedido > fin) return false;
+                return true;
+            })
+            .reduce((sum, p) => sum + contarProductos(p), 0);
+    }
+
     // Progreso de cliente en meta activa
-    function progresoCliente(clienteId, metaRequired) {
-        const completados = getPedidosEntregados(clienteId);
-        return Math.min(completados, metaRequired);
+    function progresoCliente(clienteId, meta) {
+        const completados = getProductosEntregadosParaMeta(clienteId, meta);
+        return Math.min(completados, meta.meta);
     }
 
     let metasActivas = $derived(metas.filter((m) => m.activa));
@@ -66,7 +111,7 @@
     // Clientes que alcanzaron cada meta activa
     function clientesQueAlcanzaron(meta) {
         return clientes.filter(
-            (c) => getPedidosEntregados(c.id) >= meta.meta,
+            (c) => getProductosEntregadosParaMeta(c.id, meta) >= meta.meta,
         );
     }
 
@@ -78,10 +123,17 @@
             await saveMeta({
                 titulo: nuevaMeta.titulo,
                 meta: Number(nuevaMeta.meta),
-                caducidad: nuevaMeta.indefinida ? null : nuevaMeta.caducidad || null,
+                caducidad: nuevaMeta.indefinida
+                    ? null
+                    : nuevaMeta.caducidad || null,
                 indefinida: nuevaMeta.indefinida,
             });
-            nuevaMeta = { titulo: "", meta: "", caducidad: "", indefinida: false };
+            nuevaMeta = {
+                titulo: "",
+                meta: "",
+                caducidad: "",
+                indefinida: false,
+            };
         } catch (err) {
             console.error("Error creando meta:", err);
         } finally {
@@ -90,8 +142,8 @@
     }
 
     async function handleEliminarMeta(meta) {
-        const alcanzaron = clientesQueAlcanzaron(meta).map(
-            (c) => `${c.nombre || ""} ${c.apellido || ""}`.trim(),
+        const alcanzaron = clientesQueAlcanzaron(meta).map((c) =>
+            `${c.nombre || ""} ${c.apellido || ""}`.trim(),
         );
         try {
             await eliminarMeta(meta.id, alcanzaron);
@@ -103,20 +155,31 @@
 
 <div class="space-y-6 p-4 sm:p-6">
     <header class="rounded-3xl bg-white p-4 shadow-sm sm:p-6">
-        <p class="text-sm font-semibold uppercase tracking-[0.2em] text-[#CDB9FE]">Fidelidad</p>
-        <h1 class="mt-2 text-2xl font-bold text-gray-800">Programa de fidelidad</h1>
+        <p
+            class="text-sm font-semibold uppercase tracking-[0.2em] text-[#CDB9FE]"
+        >
+            Fidelidad
+        </p>
+        <h1 class="mt-2 text-2xl font-bold text-gray-800">
+            Programa de fidelidad
+        </h1>
         <p class="mt-2 text-sm text-gray-500">
-            Gestiona metas, revisa el progreso de clientes y conserva el historial de premios.
+            Gestiona metas, revisa el progreso de clientes y conserva el
+            historial de premios.
         </p>
     </header>
 
     <!-- Clientes y pedidos entregados -->
     <section class="rounded-3xl bg-white p-4 shadow-sm sm:p-6">
-        <h2 class="text-lg font-bold text-gray-800">Clientes y pedidos completados</h2>
+        <h2 class="text-lg font-bold text-gray-800">
+            Clientes y pedidos completados
+        </h2>
         {#if loading}
             <p class="mt-4 text-sm text-gray-400">Cargando clientes...</p>
         {:else if clientes.length === 0}
-            <p class="mt-4 text-sm text-gray-400">No hay clientes registrados aún.</p>
+            <p class="mt-4 text-sm text-gray-400">
+                No hay clientes registrados aún.
+            </p>
         {:else}
             <div class="mt-4 space-y-3">
                 {#each clientes as cliente}
@@ -132,30 +195,52 @@
                                     class="h-9 w-9 rounded-full object-cover"
                                 />
                             {:else}
-                                <div class="flex h-9 w-9 items-center justify-center rounded-full bg-[#CDB9FE] text-gray-800">
+                                <div
+                                    class="flex h-9 w-9 items-center justify-center rounded-full bg-[#CDB9FE] text-gray-800"
+                                >
                                     <i class="fa-solid fa-user text-xs"></i>
                                 </div>
                             {/if}
                             <p class="font-semibold text-gray-800">
-                                {cliente.nombre || ""} {cliente.apellido || ""}
+                                {cliente.nombre || ""}
+                                {cliente.apellido || ""}
                             </p>
                         </div>
                         <div class="flex items-center gap-3">
                             <!-- Progreso en metas activas -->
                             {#each metasActivas as meta}
+                                {@const entregadosMeta =
+                                    getProductosEntregadosParaMeta(
+                                        cliente.id,
+                                        meta,
+                                    )}
                                 <div class="hidden sm:flex items-center gap-1">
-                                    <div class="h-2 w-24 overflow-hidden rounded-full bg-gray-100">
+                                    <div
+                                        class="h-2 w-24 overflow-hidden rounded-full bg-gray-100"
+                                    >
                                         <div
                                             class="h-full rounded-full bg-[#CDB9FE] transition-all duration-500"
-                                            style:width="{Math.min(100, Math.round((entregados / meta.meta) * 100))}%"
+                                            style:width="{Math.min(
+                                                100,
+                                                Math.round(
+                                                    (entregadosMeta /
+                                                        meta.meta) *
+                                                        100,
+                                                ),
+                                            )}%"
                                         ></div>
                                     </div>
                                     <span class="text-xs text-gray-500">
-                                        {progresoCliente(cliente.id, meta.meta)}/{meta.meta}
+                                        {progresoCliente(
+                                            cliente.id,
+                                            meta,
+                                        )}/{meta.meta}
                                     </span>
                                 </div>
                             {/each}
-                            <span class="rounded-full bg-[#FFFB96]/70 px-3 py-1 text-sm font-semibold">
+                            <span
+                                class="rounded-full bg-[#FFFB96]/70 px-3 py-1 text-sm font-semibold"
+                            >
                                 {entregados} entregados
                             </span>
                         </div>
@@ -176,15 +261,21 @@
                     <article class="rounded-2xl bg-[#CDB9FE]/10 px-4 py-3">
                         <p class="font-semibold text-gray-800">{meta.titulo}</p>
                         <p class="mt-1 text-sm text-gray-500">
-                            Meta: {meta.meta} pedidos ·
+                            Meta: {meta.meta} productos ·
                             {meta.indefinida || !meta.caducidad
                                 ? "Sin caducidad"
                                 : `Vence ${meta.caducidad}`}
                         </p>
                         {#if alcanzaron.length > 0}
-                            <p class="mt-2 text-sm font-semibold text-green-700">
+                            <p
+                                class="mt-2 text-sm font-semibold text-green-700"
+                            >
                                 ✓ {alcanzaron.length} cliente(s) alcanzó la meta:
-                                {alcanzaron.map((c) => `${c.nombre || ""} ${c.apellido || ""}`.trim()).join(", ")}
+                                {alcanzaron
+                                    .map((c) =>
+                                        `${c.nombre || ""} ${c.apellido || ""}`.trim(),
+                                    )
+                                    .join(", ")}
                             </p>
                         {/if}
                         <button
@@ -215,7 +306,7 @@
                     bind:value={nuevaMeta.meta}
                     type="number"
                     min="1"
-                    placeholder="Pedidos requeridos para ganar"
+                    placeholder="Productos requeridos para ganar"
                     class="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-[#CDB9FE]"
                 />
                 <input
@@ -225,7 +316,10 @@
                     class="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-[#CDB9FE] disabled:opacity-50"
                 />
                 <label class="flex items-center gap-2 text-sm text-gray-700">
-                    <input type="checkbox" bind:checked={nuevaMeta.indefinida} />
+                    <input
+                        type="checkbox"
+                        bind:checked={nuevaMeta.indefinida}
+                    />
                     Meta sin caducidad
                 </label>
                 <button
@@ -247,9 +341,12 @@
                 <article class="rounded-2xl border border-gray-100 px-4 py-3">
                     <p class="font-semibold text-gray-800">{item.titulo}</p>
                     <p class="mt-1 text-sm text-gray-500">
-                        Meta: {item.meta} pedidos ·
-                        Archivada {new Date(item.archivedAt).toLocaleDateString("es-CO")}
-                        {item.caducidad ? `· Vencía ${item.caducidad}` : "· Sin caducidad"}
+                        Meta: {item.meta} productos · Archivada {new Date(
+                            item.archivedAt,
+                        ).toLocaleDateString("es-CO")}
+                        {item.caducidad
+                            ? `· Vencía ${item.caducidad}`
+                            : "· Sin caducidad"}
                     </p>
                     <p class="mt-1 text-sm text-gray-600">
                         Clientes que la alcanzaron:
@@ -259,7 +356,9 @@
                     </p>
                 </article>
             {:else}
-                <p class="text-sm text-gray-400">No hay historial de metas aún.</p>
+                <p class="text-sm text-gray-400">
+                    No hay historial de metas aún.
+                </p>
             {/each}
         </div>
     </section>

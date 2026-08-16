@@ -65,6 +65,39 @@
         ).length,
     );
 
+    // Suma la cantidad de productos (no de pedidos) de un pedido entregado.
+    // Un pedido con varios productos, o con cantidades > 1, cuenta cada
+    // unidad, no solo "1 por pedido".
+    function contarProductos(pedido) {
+        return (pedido.items || []).reduce(
+            (sum, it) => sum + (Number(it.cantidad) || 0),
+            0,
+        );
+    }
+
+    // Cuenta solo los productos entregados mientras la meta estuvo activa:
+    // desde que se creó la meta (meta.fecha) hasta su caducidad (si tiene).
+    // Así los pedidos anteriores a la meta no cuentan para el progreso.
+    function productosCompletadosParaMeta(meta) {
+        const inicio = meta.fecha ? new Date(meta.fecha) : null;
+        const fin = meta.caducidad ? new Date(meta.caducidad) : null;
+        return pedidos
+            .filter((p) => {
+                if (
+                    p.clienteId !== $currentUser?.uid &&
+                    p.clienteId !== profile?.id
+                )
+                    return false;
+                if (p.estado !== "Entregado") return false;
+                const fechaPedido = p.fecha ? new Date(p.fecha) : null;
+                if (!fechaPedido) return false;
+                if (inicio && fechaPedido < inicio) return false;
+                if (fin && fechaPedido > fin) return false;
+                return true;
+            })
+            .reduce((sum, p) => sum + contarProductos(p), 0);
+    }
+
     let tiempoConNosotros = $derived.by(() => {
         const fechaRegistro = profile?.createdAt;
         if (!fechaRegistro) return "Recién llegado";
@@ -106,13 +139,13 @@
 
     // ── Metas para el cliente ─────────────────────────────────────────────────
     function progresoMeta(meta) {
-        return Math.min(pedidosCompletados, meta.meta);
+        return Math.min(productosCompletadosParaMeta(meta), meta.meta);
     }
 
     function porcentajeMeta(meta) {
         return Math.min(
             100,
-            Math.round((pedidosCompletados / meta.meta) * 100),
+            Math.round((productosCompletadosParaMeta(meta) / meta.meta) * 100),
         );
     }
 
@@ -267,7 +300,7 @@
                                     <p
                                         class="text-xs uppercase tracking-widest text-gray-400"
                                     >
-                                        Pedidos
+                                        Productos
                                     </p>
 
                                     <p
@@ -294,7 +327,7 @@
                             <div
                                 class="mt-5 border-t border-dashed border-gray-200 pt-4"
                             >
-                                {#if pedidosCompletados >= meta.meta}
+                                {#if progresoMeta(meta) >= meta.meta}
                                     <div
                                         class="flex items-start gap-3 rounded-2xl bg-green-50 p-4"
                                     >
@@ -345,9 +378,9 @@
                                                     class="font-semibold text-[#7C3AED]"
                                                 >
                                                     {meta.meta -
-                                                        pedidosCompletados}
+                                                        progresoMeta(meta)}
                                                 </span>
-                                                pedidos para conseguir tu recompensa.
+                                                productos para conseguir tu recompensa.
                                             </p>
                                         </div>
                                     </div>
@@ -438,7 +471,7 @@
                                     {meta.titulo}
                                 </p>
                                 <p class="mt-1 text-sm text-gray-500">
-                                    Meta: {meta.meta} pedidos · Archivada {new Date(
+                                    Meta: {meta.meta} productos · Archivada {new Date(
                                         meta.archivedAt,
                                     ).toLocaleDateString("es-CO")}
                                 </p>

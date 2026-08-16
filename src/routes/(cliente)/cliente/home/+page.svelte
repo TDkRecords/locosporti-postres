@@ -244,7 +244,7 @@
         </div>
     </section>
 
-    <section class="rounded-3xl p-5 sm:p-6">
+    <section class="rounded-3xl">
         {#if loading}
             <div
                 class="flex flex-col items-center justify-center py-16 text-gray-500"
