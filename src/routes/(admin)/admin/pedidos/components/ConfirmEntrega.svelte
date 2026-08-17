@@ -1,7 +1,12 @@
 <script>
     import { uploadImage } from "$lib/upload.js";
 
-    let { open = $bindable(false), pedido = null, onConfirm, onCancel } = $props();
+    let {
+        open = $bindable(false),
+        pedido = null,
+        onConfirm,
+        onCancel,
+    } = $props();
 
     let uploading = $state(false);
     let previewUrl = $state("");
@@ -57,19 +62,28 @@
 </script>
 
 {#if open}
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-        <div class="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl animate-fade-in">
+    <div
+        class="fixed inset-0 z-51 flex items-center justify-center bg-black/40 p-4"
+    >
+        <div
+            class="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl animate-fade-in"
+        >
             <h2 class="text-xl font-bold text-gray-900">Confirmar entrega</h2>
             <p class="mt-2 text-sm text-gray-500">
-                Sube el registro fotográfico para confirmar que el pedido 
+                Sube el registro fotográfico para confirmar que el pedido
                 {#if pedido}
-                    <span class="font-bold text-gray-700">#{pedido.numero ?? pedido.id.slice(-6)}</span>
+                    <span class="font-bold text-gray-700"
+                        >#{pedido.numero ?? pedido.id.slice(-6)}</span
+                    >
                 {/if}
                 fue entregado exitosamente.
             </p>
 
             <div class="mt-6">
-                <label class="mb-2 block text-sm font-semibold text-gray-700">
+                <label
+                    for="Evidencia"
+                    class="mb-2 block text-sm font-semibold text-gray-700"
+                >
                     Evidencia fotográfica
                 </label>
 
@@ -81,6 +95,7 @@
                             class="h-48 w-full rounded-2xl object-cover border border-gray-200"
                         />
                         <button
+                            title="cancelar"
                             type="button"
                             onclick={() => {
                                 fileToUpload = null;
@@ -94,9 +109,14 @@
                 {/if}
 
                 {#if !previewUrl}
-                    <div class="relative flex h-32 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#CDB9FE] bg-[#CDB9FE]/10 transition hover:bg-[#CDB9FE]/20">
-                        <i class="fa-solid fa-camera text-3xl text-[#7c4dff]"></i>
-                        <span class="mt-2 text-sm font-semibold text-[#7c4dff]">Tomar o subir foto</span>
+                    <div
+                        class="relative flex h-32 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#CDB9FE] bg-[#CDB9FE]/10 transition hover:bg-[#CDB9FE]/20"
+                    >
+                        <i class="fa-solid fa-camera text-3xl text-[#7c4dff]"
+                        ></i>
+                        <span class="mt-2 text-sm font-semibold text-[#7c4dff]"
+                            >Tomar o subir foto</span
+                        >
                         <input
                             type="file"
                             accept="image/*"
@@ -136,8 +156,14 @@
 
 <style>
     @keyframes fadeIn {
-        from { opacity: 0; transform: scale(0.95); }
-        to { opacity: 1; transform: scale(1); }
+        from {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
     }
     .animate-fade-in {
         animation: fadeIn 0.2s ease-out;

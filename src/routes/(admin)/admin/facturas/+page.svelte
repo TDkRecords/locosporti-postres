@@ -1,6 +1,10 @@
 <script>
     import { onMount } from "svelte";
-    import { watchCollection, aprobarFactura, cancelarFactura } from "$lib/firestore.js";
+    import {
+        watchCollection,
+        aprobarFactura,
+        cancelarFactura,
+    } from "$lib/firestore.js";
 
     let facturas = $state([]);
     let clientes = $state([]);
@@ -14,13 +18,21 @@
     let unsubFacturas, unsubClientes;
 
     onMount(() => {
-        unsubFacturas = watchCollection("facturas", (data) => {
-            facturas = data;
-            loading = false;
-        }, "fecha");
-        unsubClientes = watchCollection("clientes", (data) => {
-            clientes = data;
-        }, "createdAt");
+        unsubFacturas = watchCollection(
+            "facturas",
+            (data) => {
+                facturas = data;
+                loading = false;
+            },
+            "fecha",
+        );
+        unsubClientes = watchCollection(
+            "clientes",
+            (data) => {
+                clientes = data;
+            },
+            "createdAt",
+        );
 
         return () => {
             unsubFacturas?.();
@@ -29,9 +41,15 @@
     });
 
     function getNombreCliente(clienteId) {
-        const c = clientes.find((x) => x.id === clienteId || x.uid === clienteId);
+        const c = clientes.find(
+            (x) => x.id === clienteId || x.uid === clienteId,
+        );
         if (!c) return "Cliente";
-        return `${c.nombre || ""} ${c.apellido || ""}`.trim() || c.email || "Cliente";
+        return (
+            `${c.nombre || ""} ${c.apellido || ""}`.trim() ||
+            c.email ||
+            "Cliente"
+        );
     }
 
     function filtrarPorFecha(lista, campo = "fecha", rango = "1D") {
@@ -41,7 +59,9 @@
         else if (rango === "7D") corte.setDate(corte.getDate() - 7);
         else if (rango === "30D") corte.setDate(corte.getDate() - 30);
         else if (rango === "12M") corte.setMonth(corte.getMonth() - 12);
-        return lista.filter((item) => item[campo] && new Date(item[campo]) >= corte);
+        return lista.filter(
+            (item) => item[campo] && new Date(item[campo]) >= corte,
+        );
     }
 
     let facturasFiltradas = $derived.by(() => {
@@ -60,17 +80,25 @@
             return coincideBusqueda && coincideEstado;
         });
 
-        if (ordenMonto === "mayor") lista = [...lista].sort((a, b) => b.monto - a.monto);
-        else if (ordenMonto === "menor") lista = [...lista].sort((a, b) => a.monto - b.monto);
+        if (ordenMonto === "mayor")
+            lista = [...lista].sort((a, b) => b.monto - a.monto);
+        else if (ordenMonto === "menor")
+            lista = [...lista].sort((a, b) => a.monto - b.monto);
 
         return lista;
     });
 
-    let aprobadas = $derived(facturas.filter((f) => f.estado === "aprobada").length);
-    let pendientes = $derived(
-        facturas.filter((f) => f.estado === "pendiente" || f.estado === "pendiente_pago").length,
+    let aprobadas = $derived(
+        facturas.filter((f) => f.estado === "aprobada").length,
     );
-    let canceladas = $derived(facturas.filter((f) => f.estado === "cancelada").length);
+    let pendientes = $derived(
+        facturas.filter(
+            (f) => f.estado === "pendiente" || f.estado === "pendiente_pago",
+        ).length,
+    );
+    let canceladas = $derived(
+        facturas.filter((f) => f.estado === "cancelada").length,
+    );
 
     async function handleAprobar(id) {
         try {
@@ -90,11 +118,16 @@
 
     function estadoLabel(estado) {
         switch (estado) {
-            case "aprobada": return "Aprobada";
-            case "pendiente": return "Pendiente";
-            case "pendiente_pago": return "Pendiente de pago";
-            case "cancelada": return "Cancelada";
-            default: return estado;
+            case "aprobada":
+                return "Aprobada";
+            case "pendiente":
+                return "Pendiente";
+            case "pendiente_pago":
+                return "Pendiente de pago";
+            case "cancelada":
+                return "Cancelada";
+            default:
+                return estado;
         }
     }
 
@@ -106,13 +139,37 @@
 </script>
 
 <div class="space-y-6 p-4 sm:p-6">
-    <header class="rounded-3xl bg-white p-4 shadow-sm sm:p-6">
-        <p class="text-sm font-semibold uppercase tracking-[0.2em] text-[#CDB9FE]">Facturas</p>
-        <h1 class="mt-2 text-2xl font-bold text-gray-800">Gestión de facturas</h1>
-        <p class="mt-2 text-sm text-gray-500">
-            Aprueba facturas pendientes, consulta el historial y gestiona cancelaciones.
-            Las facturas por transferencia se aprueban automáticamente al crear el pedido.
-        </p>
+    <header class="overflow-hidden rounded-3xl bg-white shadow-sm">
+        <div class="p-5 sm:p-6">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div class="flex min-w-0 items-center gap-4">
+                    <div
+                        class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#CDB9FE]/20 text-[#7C3AED]"
+                    >
+                        <i class="fa-solid fa-file-invoice-dollar text-xl"></i>
+                    </div>
+
+                    <div class="min-w-0">
+                        <p class="text-sm font-medium text-[#7C3AED]">
+                            Facturas
+                        </p>
+
+                        <h1
+                            class="mt-0.5 text-2xl font-bold text-gray-900 sm:text-3xl"
+                        >
+                            Gestión de facturas
+                        </h1>
+
+                        <p class="mt-1 text-sm text-gray-500">
+                            Aprueba facturas pendientes, consulta el historial y
+                            gestiona cancelaciones. Las facturas por
+                            transferencia se aprueban automáticamente al crear
+                            el pedido.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </header>
 
     <section class="grid gap-4 sm:grid-cols-3">
@@ -175,7 +232,9 @@
         {:else}
             <div class="mt-6 space-y-3">
                 {#each facturasFiltradas as factura}
-                    <article class="rounded-2xl border border-gray-100 px-4 py-4">
+                    <article
+                        class="rounded-2xl border border-gray-100 px-4 py-4"
+                    >
                         <div
                             class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
                         >
@@ -185,20 +244,32 @@
                                 </p>
                                 <p class="text-sm text-gray-500">
                                     {getNombreCliente(factura.clienteId)} ·
-                                    {new Date(factura.fecha).toLocaleDateString("es-CO")}
+                                    {new Date(factura.fecha).toLocaleDateString(
+                                        "es-CO",
+                                    )}
                                 </p>
-                                <p class="mt-1 text-xs uppercase tracking-[0.15em] text-gray-400">
+                                <p
+                                    class="mt-1 text-xs uppercase tracking-[0.15em] text-gray-400"
+                                >
                                     {factura.metodoPago === "transferencia"
                                         ? "Transferencia (auto-aprobada)"
                                         : "Contra entrega"}
                                 </p>
                                 {#if factura.notas}
-                                    <p class="mt-1 text-sm text-gray-500 italic">"{factura.notas}"</p>
+                                    <p
+                                        class="mt-1 text-sm text-gray-500 italic"
+                                    >
+                                        "{factura.notas}"
+                                    </p>
                                 {/if}
                             </div>
-                            <div class="flex flex-col items-start gap-2 sm:items-end">
+                            <div
+                                class="flex flex-col items-start gap-2 sm:items-end"
+                            >
                                 <p class="text-lg font-bold text-gray-800">
-                                    ${(Number(factura.monto) || 0).toLocaleString("es-CO")}
+                                    ${(
+                                        Number(factura.monto) || 0
+                                    ).toLocaleString("es-CO")}
                                 </p>
                                 <span
                                     class={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${estadoColor(factura.estado)}`}
@@ -209,14 +280,16 @@
                                     <div class="flex gap-2">
                                         <button
                                             type="button"
-                                            onclick={() => handleAprobar(factura.id)}
+                                            onclick={() =>
+                                                handleAprobar(factura.id)}
                                             class="rounded-xl bg-[#CDB9FE] px-3 py-1.5 text-xs font-semibold text-gray-900 transition hover:bg-[#bfa3fd]"
                                         >
                                             Marcar pagada
                                         </button>
                                         <button
                                             type="button"
-                                            onclick={() => handleCancelar(factura.id)}
+                                            onclick={() =>
+                                                handleCancelar(factura.id)}
                                             class="rounded-xl bg-[#FFCDDB] px-3 py-1.5 text-xs font-semibold text-gray-900 transition hover:bg-[#ffb6c0]"
                                         >
                                             Cancelar
@@ -229,7 +302,9 @@
                 {:else}
                     <div class="py-8 text-center text-gray-400">
                         <i class="fa-solid fa-file-invoice text-4xl"></i>
-                        <p class="mt-3 text-sm">No hay facturas en el período seleccionado.</p>
+                        <p class="mt-3 text-sm">
+                            No hay facturas en el período seleccionado.
+                        </p>
                     </div>
                 {/each}
             </div>

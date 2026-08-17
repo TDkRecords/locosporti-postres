@@ -154,19 +154,35 @@
 </script>
 
 <div class="space-y-6 p-4 sm:p-6">
-    <header class="rounded-3xl bg-white p-4 shadow-sm sm:p-6">
-        <p
-            class="text-sm font-semibold uppercase tracking-[0.2em] text-[#CDB9FE]"
-        >
-            Fidelidad
-        </p>
-        <h1 class="mt-2 text-2xl font-bold text-gray-800">
-            Programa de fidelidad
-        </h1>
-        <p class="mt-2 text-sm text-gray-500">
-            Gestiona metas, revisa el progreso de clientes y conserva el
-            historial de premios.
-        </p>
+    <header class="overflow-hidden rounded-3xl bg-white shadow-sm">
+        <div class="p-5 sm:p-6">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div class="flex min-w-0 items-center gap-4">
+                    <div
+                        class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#CDB9FE]/20 text-[#7C3AED]"
+                    >
+                        <i class="fa-solid fa-gift text-xl"></i>
+                    </div>
+
+                    <div class="min-w-0">
+                        <p class="text-sm font-medium text-[#7C3AED]">
+                            Fidelidad
+                        </p>
+
+                        <h1
+                            class="mt-0.5 text-2xl font-bold text-gray-900 sm:text-3xl"
+                        >
+                            Programa de fidelidad
+                        </h1>
+
+                        <p class="mt-1 text-sm text-gray-500">
+                            Gestiona metas, revisa el progreso de clientes y
+                            conserva el historial de premios.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </header>
 
     <!-- Clientes y pedidos entregados -->

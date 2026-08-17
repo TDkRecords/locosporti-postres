@@ -179,79 +179,150 @@
     }
 </script>
 
-<div class="space-y-6 p-4 sm:p-6">
-    <header class="rounded-3xl bg-white p-4 shadow-sm sm:p-6">
-        <p
-            class="text-sm font-semibold uppercase tracking-[0.2em] text-[#CDB9FE]"
-        >
-            Productos
-        </p>
-        <h1 class="mt-2 text-2xl font-bold text-gray-800">
-            Gestión de catálogo y disponibilidad
-        </h1>
-        <p class="mt-2 text-sm text-gray-500">
-            Administra tus productos con una vista resumida del inventario y el
-            estado de cada item.
-        </p>
+<div class="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
+    <!-- Header -->
+    <header class="overflow-hidden rounded-3xl bg-white shadow-sm">
+        <div class="p-5 sm:p-6">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div class="flex min-w-0 items-center gap-4">
+                    <div
+                        class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#CDB9FE]/20 text-[#7C3AED]"
+                    >
+                        <i class="fa-solid fa-boxes-stacked text-xl"></i>
+                    </div>
+
+                    <div class="min-w-0">
+                        <p class="text-sm font-medium text-[#7C3AED]">
+                            Productos
+                        </p>
+
+                        <h1
+                            class="mt-0.5 text-2xl font-bold text-gray-900 sm:text-3xl"
+                        >
+                            Gestión de catálogo
+                        </h1>
+
+                        <p class="mt-1 text-sm text-gray-500">
+                            Administra el inventario, disponibilidad y estado de
+                            cada producto.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </header>
 
-    <section class="grid gap-4 md:grid-cols-4">
-        <div class="rounded-3xl bg-white p-4 shadow-sm">
-            <p class="text-sm text-gray-500">Disponibles</p>
-            <p class="mt-2 text-2xl font-bold text-gray-800">
+    <!-- KPIs -->
+    <section class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div
+            class="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+        >
+            <div class="flex items-center justify-between">
+                <i class="fa-solid fa-circle-check text-green-500"></i>
+                <span class="text-xs text-gray-500">Disponibles</span>
+            </div>
+
+            <p class="mt-4 text-3xl font-bold text-gray-900">
                 {productosDisponibles}
             </p>
+
+            <p class="text-sm text-gray-500">Listos para vender</p>
         </div>
-        <div class="rounded-3xl bg-white p-4 shadow-sm">
-            <p class="text-sm text-gray-500">Descontinuados</p>
-            <p class="mt-2 text-2xl font-bold text-gray-800">
+
+        <div
+            class="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+        >
+            <div class="flex items-center justify-between">
+                <i class="fa-solid fa-pause-circle text-amber-500"></i>
+                <span class="text-xs text-gray-500">Descontinuados</span>
+            </div>
+
+            <p class="mt-4 text-3xl font-bold text-gray-900">
                 {productosDescontinuados}
             </p>
+
+            <p class="text-sm text-gray-500">Fuera de venta</p>
         </div>
-        <div class="rounded-3xl bg-white p-4 shadow-sm">
-            <p class="text-sm text-gray-500">Eliminados</p>
-            <p class="mt-2 text-2xl font-bold text-gray-800">
+
+        <div
+            class="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+        >
+            <div class="flex items-center justify-between">
+                <i class="fa-solid fa-trash text-red-500"></i>
+                <span class="text-xs text-gray-500">Eliminados</span>
+            </div>
+
+            <p class="mt-4 text-3xl font-bold text-gray-900">
                 {productosEliminados}
             </p>
+
+            <p class="text-sm text-gray-500">Histórico</p>
         </div>
-        <div class="rounded-3xl bg-white p-4 shadow-sm">
-            <p class="text-sm text-gray-500">Valor de inventario</p>
-            <p class="mt-2 text-2xl font-bold text-gray-800">
+
+        <div
+            class="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+        >
+            <div class="flex items-center justify-between">
+                <i class="fa-solid fa-wallet text-[#7C3AED]"></i>
+                <span class="text-xs text-gray-500">Inventario</span>
+            </div>
+
+            <p class="mt-4 wrap-break-words text-2xl font-bold text-gray-900">
                 ${valorInventario.toLocaleString("es-CO")}
             </p>
+
+            <p class="text-sm text-gray-500">Valor estimado</p>
         </div>
     </section>
 
-    <section class="rounded-3xl bg-white p-4 shadow-sm sm:p-6">
-        <div
-            class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
-        >
-            <div>
-                <h2 class="text-lg font-bold text-gray-800">Catálogo</h2>
-                <p class="mt-1 text-sm text-gray-500">
-                    Busca productos y filtra por estado para encontrar lo que
-                    necesites rápido.
-                </p>
-            </div>
+    <!-- Catálogo -->
+    <section class="rounded-3xl bg-white shadow-sm">
+        <div class="border-b border-gray-100 p-5 sm:p-6">
+            <div
+                class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"
+            >
+                <div>
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-box-open text-[#7C3AED]"></i>
+                        <h2 class="text-xl font-bold text-gray-900">
+                            Catálogo
+                        </h2>
+                    </div>
 
-            <div class="flex flex-col gap-2 sm:flex-row">
-                <input
-                    bind:value={busqueda}
-                    placeholder="Buscar producto"
-                    class="rounded-2xl border border-gray-200 px-3 py-2.5 text-sm outline-none"
-                />
-                <select
-                    bind:value={filtroEstado}
-                    class="rounded-2xl border border-gray-200 px-3 py-2.5 text-sm"
-                >
-                    <option value="todos">Todos</option>
-                    <option value="disponible">Disponibles</option>
-                    <option value="descontinuado">Descontinuados</option>
-                </select>
+                    <p class="mt-1 text-sm text-gray-500">
+                        Busca productos y filtra por estado para encontrar lo
+                        que necesitas rápidamente.
+                    </p>
+                </div>
+
+                <!-- Filtros -->
+                <div class="flex w-full flex-col gap-3 sm:flex-row xl:w-auto">
+                    <div class="relative flex-1 xl:min-w-65">
+                        <i
+                            class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+                        ></i>
+
+                        <input
+                            bind:value={busqueda}
+                            placeholder="Buscar producto..."
+                            class="w-full rounded-2xl border border-gray-200 bg-gray-50 py-3 pl-11 pr-4 text-sm transition focus:border-[#CDB9FE] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#CDB9FE]/20"
+                        />
+                    </div>
+
+                    <select
+                        bind:value={filtroEstado}
+                        class="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm transition focus:border-[#CDB9FE] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#CDB9FE]/20"
+                    >
+                        <option value="todos">Todos</option>
+                        <option value="disponible">Disponibles</option>
+                        <option value="descontinuado">Descontinuados</option>
+                    </select>
+                </div>
             </div>
         </div>
 
-        <div class="mt-5">
+        <!-- Lista -->
+        <div class="p-5 sm:p-6">
             <ListProducto
                 productos={productosFiltrados}
                 onSelectProduct={openDetail}
