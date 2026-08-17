@@ -1,21 +1,23 @@
 <script>
     import { onMount } from "svelte";
+    import ListMeta from "./components/ListMeta.svelte";
+    import DetailMeta from "./components/DetailMeta.svelte";
+    import FormMeta from "./components/FormMeta.svelte";
+    import ArchivarMeta from "./components/ArchivarMeta.svelte";
     import { watchCollection, saveMeta, eliminarMeta } from "$lib/firestore.js";
+
+    let showForm = $state(false);
+    let showArchivar = $state(false);
+    let metaToArchivar = $state(null);
+    let selectedMetaId = $state(null); // ID de la meta abierta en el detalle
 
     let clientes = $state([]);
     let metas = $state([]);
     let historialMetas = $state([]);
+    let pedidos = $state([]);
     let loading = $state(true);
 
-    let nuevaMeta = $state({
-        titulo: "",
-        meta: "",
-        caducidad: "",
-        indefinida: false,
-    });
-    let loadingMeta = $state(false);
-
-    let unsubClientes, unsubMetas, unsubHistorial;
+    let unsubClientes, unsubMetas, unsubHistorial, unsubPedidos;
 
     onMount(() => {
         unsubClientes = watchCollection(
@@ -43,18 +45,6 @@
             "archivedAt",
         );
 
-        return () => {
-            unsubClientes?.();
-            unsubMetas?.();
-            unsubHistorial?.();
-        };
-    });
-
-    // Para cada cliente, contar sus pedidos entregados desde los pedidos
-    // Usamos los datos embebidos en clientes (si existen) o cargamos por separado
-    let pedidos = $state([]);
-    let unsubPedidos;
-    onMount(() => {
         unsubPedidos = watchCollection(
             "pedidos",
             (data) => {
@@ -62,14 +52,19 @@
             },
             "fecha",
         );
-        return () => unsubPedidos?.();
+
+        return () => {
+            unsubClientes?.();
+            unsubMetas?.();
+            unsubHistorial?.();
+            unsubPedidos?.();
+        };
     });
 
-    function getPedidosEntregados(clienteId) {
-        return pedidos.filter(
-            (p) => p.clienteId === clienteId && p.estado === "Entregado",
-        ).length;
-    }
+    // Meta seleccionada, resuelta en vivo desde Firestore
+    let selectedMeta = $derived(
+        metas.find((m) => m.id === selectedMetaId) || null,
+    );
 
     // Suma la cantidad de productos (no de pedidos) de un pedido entregado.
     // Un pedido con varios productos, o con cantidades > 1, cuenta cada
@@ -115,40 +110,72 @@
         );
     }
 
-    async function handleCrearMeta(event) {
-        event.preventDefault();
-        if (!nuevaMeta.titulo || !nuevaMeta.meta) return;
-        loadingMeta = true;
+    // Leaderboard de progreso para la meta abierta en el detalle
+    let leaderboardSeleccionado = $derived.by(() => {
+        if (!selectedMeta) return [];
+        return clientes
+            .map((cliente) => ({
+                cliente,
+                progreso: progresoCliente(cliente.id, selectedMeta),
+                alcanzado:
+                    getProductosEntregadosParaMeta(cliente.id, selectedMeta) >=
+                    selectedMeta.meta,
+            }))
+            .sort((a, b) => b.progreso - a.progreso);
+    });
+
+    // ── KPIs ──────────────────────────────────────────────────────────────────
+    let clientesQueAlcanzaronAlguna = $derived.by(() => {
+        const ids = new Set();
+        for (const meta of metasActivas) {
+            for (const c of clientesQueAlcanzaron(meta)) ids.add(c.id);
+        }
+        return ids.size;
+    });
+
+    // ── Detalle ───────────────────────────────────────────────────────────────
+    function openDetail(meta) {
+        selectedMetaId = meta.id;
+    }
+
+    function closeDetail() {
+        selectedMetaId = null;
+    }
+
+    // ── Acciones ──────────────────────────────────────────────────────────────
+    function openCreate() {
+        showForm = true;
+    }
+
+    function openArchivar(meta) {
+        metaToArchivar = meta;
+        showArchivar = true;
+    }
+
+    function closeArchivar() {
+        showArchivar = false;
+        metaToArchivar = null;
+    }
+
+    async function handleCrearMeta(payload) {
         try {
-            await saveMeta({
-                titulo: nuevaMeta.titulo,
-                meta: Number(nuevaMeta.meta),
-                caducidad: nuevaMeta.indefinida
-                    ? null
-                    : nuevaMeta.caducidad || null,
-                indefinida: nuevaMeta.indefinida,
-            });
-            nuevaMeta = {
-                titulo: "",
-                meta: "",
-                caducidad: "",
-                indefinida: false,
-            };
+            await saveMeta(payload);
         } catch (err) {
             console.error("Error creando meta:", err);
-        } finally {
-            loadingMeta = false;
         }
     }
 
-    async function handleEliminarMeta(meta) {
+    async function handleArchivarMeta(meta) {
         const alcanzaron = clientesQueAlcanzaron(meta).map((c) =>
             `${c.nombre || ""} ${c.apellido || ""}`.trim(),
         );
         try {
             await eliminarMeta(meta.id, alcanzaron);
+            if (selectedMetaId === meta.id) closeDetail();
         } catch (err) {
-            console.error("Error eliminando meta:", err);
+            console.error("Error archivando meta:", err);
+        } finally {
+            closeArchivar();
         }
     }
 </script>
@@ -176,8 +203,8 @@
                         </h1>
 
                         <p class="mt-1 text-sm text-gray-500">
-                            Gestiona metas, revisa el progreso de clientes y
-                            conserva el historial de premios.
+                            Crea metas, revisa el progreso de cada cliente y
+                            consulta el historial de premios.
                         </p>
                     </div>
                 </div>
@@ -185,190 +212,125 @@
         </div>
     </header>
 
-    <!-- Clientes y pedidos entregados -->
-    <section class="rounded-3xl bg-white p-4 shadow-sm sm:p-6">
-        <h2 class="text-lg font-bold text-gray-800">
-            Clientes y pedidos completados
-        </h2>
-        {#if loading}
-            <p class="mt-4 text-sm text-gray-400">Cargando clientes...</p>
-        {:else if clientes.length === 0}
-            <p class="mt-4 text-sm text-gray-400">
-                No hay clientes registrados aún.
+    <!-- KPIs -->
+    <section class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div
+            class="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+        >
+            <div class="flex items-center justify-between">
+                <i class="fa-solid fa-gift text-[#7C3AED]"></i>
+                <span class="text-xs text-gray-500">Vigentes</span>
+            </div>
+            <p class="mt-4 text-3xl font-bold text-gray-900">
+                {metasActivas.length}
             </p>
-        {:else}
-            <div class="mt-4 space-y-3">
-                {#each clientes as cliente}
-                    {@const entregados = getPedidosEntregados(cliente.id)}
-                    <div
-                        class="flex items-center justify-between rounded-2xl border border-gray-100 px-4 py-3"
-                    >
-                        <div class="flex items-center gap-3">
-                            {#if cliente.photoURL}
-                                <img
-                                    src={cliente.photoURL}
-                                    alt={cliente.nombre}
-                                    class="h-9 w-9 rounded-full object-cover"
-                                />
-                            {:else}
-                                <div
-                                    class="flex h-9 w-9 items-center justify-center rounded-full bg-[#CDB9FE] text-gray-800"
-                                >
-                                    <i class="fa-solid fa-user text-xs"></i>
-                                </div>
-                            {/if}
-                            <p class="font-semibold text-gray-800">
-                                {cliente.nombre || ""}
-                                {cliente.apellido || ""}
-                            </p>
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <!-- Progreso en metas activas -->
-                            {#each metasActivas as meta}
-                                {@const entregadosMeta =
-                                    getProductosEntregadosParaMeta(
-                                        cliente.id,
-                                        meta,
-                                    )}
-                                <div class="hidden sm:flex items-center gap-1">
-                                    <div
-                                        class="h-2 w-24 overflow-hidden rounded-full bg-gray-100"
-                                    >
-                                        <div
-                                            class="h-full rounded-full bg-[#CDB9FE] transition-all duration-500"
-                                            style:width="{Math.min(
-                                                100,
-                                                Math.round(
-                                                    (entregadosMeta /
-                                                        meta.meta) *
-                                                        100,
-                                                ),
-                                            )}%"
-                                        ></div>
-                                    </div>
-                                    <span class="text-xs text-gray-500">
-                                        {progresoCliente(
-                                            cliente.id,
-                                            meta,
-                                        )}/{meta.meta}
-                                    </span>
-                                </div>
-                            {/each}
-                            <span
-                                class="rounded-full bg-[#FFFB96]/70 px-3 py-1 text-sm font-semibold"
-                            >
-                                {entregados} entregados
-                            </span>
-                        </div>
-                    </div>
-                {/each}
+            <p class="text-sm text-gray-500">Metas activas</p>
+        </div>
+
+        <div
+            class="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+        >
+            <div class="flex items-center justify-between">
+                <i class="fa-solid fa-users text-blue-500"></i>
+                <span class="text-xs text-gray-500">Total</span>
             </div>
-        {/if}
+            <p class="mt-4 text-3xl font-bold text-blue-600">
+                {clientes.length}
+            </p>
+            <p class="text-sm text-gray-500">Clientes</p>
+        </div>
+
+        <div
+            class="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+        >
+            <div class="flex items-center justify-between">
+                <i class="fa-solid fa-trophy text-green-500"></i>
+                <span class="text-xs text-gray-500">Ganando</span>
+            </div>
+            <p class="mt-4 text-3xl font-bold text-green-600">
+                {clientesQueAlcanzaronAlguna}
+            </p>
+            <p class="text-sm text-gray-500">Alcanzaron una meta</p>
+        </div>
+
+        <div
+            class="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+        >
+            <div class="flex items-center justify-between">
+                <i class="fa-solid fa-box-archive text-amber-500"></i>
+                <span class="text-xs text-gray-500">Histórico</span>
+            </div>
+            <p class="mt-4 text-3xl font-bold text-amber-600">
+                {historialMetas.length}
+            </p>
+            <p class="text-sm text-gray-500">Metas archivadas</p>
+        </div>
     </section>
 
-    <!-- Metas activas + Nueva meta -->
-    <section class="grid gap-6 lg:grid-cols-2">
-        <!-- Metas activas -->
-        <div class="rounded-3xl bg-white p-4 shadow-sm sm:p-6">
+    <!-- Metas activas -->
+    <section class="rounded-3xl bg-white p-5 shadow-sm sm:p-6">
+        <div class="flex items-center gap-2">
+            <i class="fa-solid fa-gift text-[#7C3AED]"></i>
             <h2 class="text-lg font-bold text-gray-800">Metas activas</h2>
-            <div class="mt-4 space-y-3">
-                {#each metasActivas as meta}
-                    {@const alcanzaron = clientesQueAlcanzaron(meta)}
-                    <article class="rounded-2xl bg-[#CDB9FE]/10 px-4 py-3">
-                        <p class="font-semibold text-gray-800">{meta.titulo}</p>
-                        <p class="mt-1 text-sm text-gray-500">
-                            Meta: {meta.meta} productos ·
-                            {meta.indefinida || !meta.caducidad
-                                ? "Sin caducidad"
-                                : `Vence ${meta.caducidad}`}
-                        </p>
-                        {#if alcanzaron.length > 0}
-                            <p
-                                class="mt-2 text-sm font-semibold text-green-700"
-                            >
-                                ✓ {alcanzaron.length} cliente(s) alcanzó la meta:
-                                {alcanzaron
-                                    .map((c) =>
-                                        `${c.nombre || ""} ${c.apellido || ""}`.trim(),
-                                    )
-                                    .join(", ")}
-                            </p>
-                        {/if}
-                        <button
-                            type="button"
-                            onclick={() => handleEliminarMeta(meta)}
-                            class="mt-3 rounded-xl bg-[#FFCDDB] px-3 py-1.5 text-xs font-semibold text-gray-900 transition hover:bg-[#ffb6c0]"
-                        >
-                            Archivar meta
-                        </button>
-                    </article>
-                {:else}
-                    <p class="text-sm text-gray-400">No hay metas activas.</p>
-                {/each}
-            </div>
         </div>
+        <p class="mt-1 text-sm text-gray-500">
+            Toca una meta para ver el progreso de cada cliente.
+        </p>
 
-        <!-- Nueva meta -->
-        <div class="rounded-3xl bg-white p-4 shadow-sm sm:p-6">
-            <h2 class="text-lg font-bold text-gray-800">Nueva meta</h2>
-            <form class="mt-4 space-y-3" onsubmit={handleCrearMeta}>
-                <input
-                    bind:value={nuevaMeta.titulo}
-                    type="text"
-                    placeholder="Título del premio"
-                    class="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-[#CDB9FE]"
+        <div class="mt-4">
+            {#if loading}
+                <p class="p-8 text-center text-gray-400">Cargando metas...</p>
+            {:else if metasActivas.length === 0}
+                <div class="p-8 text-center text-gray-400">
+                    <i class="fa-solid fa-gift text-4xl"></i>
+                    <p class="mt-3 text-sm">
+                        No hay metas activas. Crea una con el botón +.
+                    </p>
+                </div>
+            {:else}
+                <ListMeta
+                    metas={metasActivas}
+                    {clientesQueAlcanzaron}
+                    onSelectMeta={openDetail}
                 />
-                <input
-                    bind:value={nuevaMeta.meta}
-                    type="number"
-                    min="1"
-                    placeholder="Productos requeridos para ganar"
-                    class="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-[#CDB9FE]"
-                />
-                <input
-                    bind:value={nuevaMeta.caducidad}
-                    type="date"
-                    disabled={nuevaMeta.indefinida}
-                    class="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-[#CDB9FE] disabled:opacity-50"
-                />
-                <label class="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                        type="checkbox"
-                        bind:checked={nuevaMeta.indefinida}
-                    />
-                    Meta sin caducidad
-                </label>
-                <button
-                    type="submit"
-                    disabled={loadingMeta}
-                    class="w-full rounded-2xl bg-[#CDB9FE] px-4 py-3 font-semibold text-gray-900 transition hover:bg-[#bfa3fd] disabled:opacity-70"
-                >
-                    {loadingMeta ? "Creando..." : "Crear meta"}
-                </button>
-            </form>
+            {/if}
         </div>
     </section>
 
-    <!-- Historial de metas archivadas -->
-    <section class="rounded-3xl bg-white p-4 shadow-sm sm:p-6">
-        <h2 class="text-lg font-bold text-gray-800">Historial de metas</h2>
+    <!-- Historial de metas -->
+    <section class="rounded-3xl bg-white p-5 shadow-sm sm:p-6">
+        <div class="flex items-center gap-2">
+            <i class="fa-solid fa-box-archive text-[#7C3AED]"></i>
+            <h2 class="text-lg font-bold text-gray-800">Historial de metas</h2>
+        </div>
+
         <div class="mt-4 space-y-3">
             {#each historialMetas as item}
                 <article class="rounded-2xl border border-gray-100 px-4 py-3">
-                    <p class="font-semibold text-gray-800">{item.titulo}</p>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <p class="font-semibold text-gray-800">{item.titulo}</p>
+                        <span
+                            class="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600"
+                        >
+                            Archivada {new Date(
+                                item.archivedAt,
+                            ).toLocaleDateString("es-CO")}
+                        </span>
+                    </div>
                     <p class="mt-1 text-sm text-gray-500">
-                        Meta: {item.meta} productos · Archivada {new Date(
-                            item.archivedAt,
-                        ).toLocaleDateString("es-CO")}
+                        Meta: {item.meta} productos ·
                         {item.caducidad
-                            ? `· Vencía ${item.caducidad}`
-                            : "· Sin caducidad"}
+                            ? `Vencía ${item.caducidad}`
+                            : "Sin caducidad"}
                     </p>
                     <p class="mt-1 text-sm text-gray-600">
-                        Clientes que la alcanzaron:
-                        {(item.clientesAlcanzaron || []).length > 0
-                            ? item.clientesAlcanzaron.join(", ")
-                            : "Ninguno"}
+                        {#if (item.clientesAlcanzaron || []).length > 0}
+                            <i class="fa-solid fa-trophy mr-1.5 text-amber-500"
+                            ></i>
+                            {item.clientesAlcanzaron.join(", ")}
+                        {:else}
+                            Ningún cliente la alcanzó.
+                        {/if}
                     </p>
                 </article>
             {:else}
@@ -379,3 +341,52 @@
         </div>
     </section>
 </div>
+
+<!-- FAB -->
+{#if !showForm && !selectedMeta}
+    <div
+        class="pointer-events-none fixed right-0 bottom-18 left-0 z-40 lg:bottom-6"
+    >
+        <div class="container mx-auto flex justify-end px-4">
+            <button
+                title="Nueva meta"
+                type="button"
+                onclick={openCreate}
+                class="pointer-events-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#CDB9FE] text-2xl text-white shadow-xl transition-all duration-200 hover:scale-110 active:scale-95"
+            >
+                <i class="fa-solid fa-plus"></i>
+            </button>
+        </div>
+    </div>
+{/if}
+
+<FormMeta bind:open={showForm} onSubmit={handleCrearMeta} />
+
+<ArchivarMeta
+    bind:open={showArchivar}
+    meta={metaToArchivar}
+    onConfirm={handleArchivarMeta}
+/>
+
+<!-- Detail -->
+{#if selectedMeta}
+    <div
+        class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm"
+    >
+        <button
+            type="button"
+            aria-label="Cerrar detalle"
+            onclick={closeDetail}
+            class="absolute inset-0 cursor-default"
+        ></button>
+
+        <div class="relative z-10 w-full max-w-xl">
+            <DetailMeta
+                meta={selectedMeta}
+                leaderboard={leaderboardSeleccionado}
+                onClose={closeDetail}
+                onArchive={openArchivar}
+            />
+        </div>
+    </div>
+{/if}
