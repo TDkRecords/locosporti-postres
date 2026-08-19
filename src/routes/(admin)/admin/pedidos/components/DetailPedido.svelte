@@ -7,7 +7,6 @@
         onClose,
         onEdit,
         onCancel,
-        onChangeStatus,
     } = $props();
 
     function getNombreProducto(productId) {
@@ -21,9 +20,6 @@
     }
 
     let puedeGestionar = $derived(pedido.estado !== "Cancelado");
-    let puedeCambiarEstado = $derived(
-        pedido.estado !== "Cancelado" && pedido.estado !== "Entregado",
-    );
 </script>
 
 <article
@@ -121,35 +117,11 @@
             </div>
 
             <div class="rounded-2xl bg-[#CDB9FE]/20 p-3 sm:p-4">
-                <p class="text-[11px] text-gray-500">Cambiar estado</p>
+                <p class="text-[11px] text-gray-500">Estado</p>
 
-                {#if puedeCambiarEstado}
-                    <select
-                        class="mt-1 w-full rounded-xl border border-gray-200 bg-white px-2 py-1.5 text-xs font-semibold text-gray-700"
-                        value=""
-                        onchange={(e) => {
-                            if (e.target.value) {
-                                onChangeStatus?.(
-                                    pedido,
-                                    e.target.value,
-                                    e.target,
-                                );
-                            }
-                        }}
-                    >
-                        <option value="">Seleccionar</option>
-                        <option value="Preparando">Preparando</option>
-                        <option value="Empacado">Empacado</option>
-                        <option value="A domicilio">A domicilio</option>
-                        <option value="Entregado">Entregado</option>
-                    </select>
-                {:else}
-                    <h4 class="text-sm font-bold text-gray-800 sm:text-base">
-                        {pedido.estado === "Entregado"
-                            ? "Ya entregado"
-                            : "Pedido cancelado"}
-                    </h4>
-                {/if}
+                <h4 class="text-sm font-bold text-gray-800 sm:text-base">
+                    {pedido.estado}
+                </h4>
             </div>
         </div>
 

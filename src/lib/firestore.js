@@ -159,17 +159,77 @@ export const getNextPedidoNumber = async () => {
 // ─── Pedidos + Facturas ───────────────────────────────────────────────────────
 
 /**
+ * Flujo lineal de estados de un pedido. Un pedido solo puede avanzar
+ * al estado que le sigue inmediatamente, nunca retroceder ni saltar pasos.
+ * "Cancelado" es la única excepción: se puede cancelar desde cualquier
+ * estado que no sea "Entregado" o "Cancelado".
+ */
+export const ESTADOS_FLUJO_PEDIDO = ["Preparando", "Empacado", "A domicilio", "Entregado"];
+
+/**
+ * Devuelve el único estado siguiente válido para un pedido, o null si el
+ * pedido ya llegó a un estado final (Entregado / Cancelado).
+ */
+export const siguienteEstadoPedido = (estadoActual) => {
+    const idx = ESTADOS_FLUJO_PEDIDO.indexOf(estadoActual);
+    if (idx === -1 || idx === ESTADOS_FLUJO_PEDIDO.length - 1) return null;
+    return ESTADOS_FLUJO_PEDIDO[idx + 1];
+};
+
+/**
+ * Valida que la transición de un estado a otro sea válida según el flujo
+ * lineal (solo avanzar un paso a la vez) o una cancelación permitida.
+ */
+export const esTransicionEstadoValida = (estadoActual, estadoNuevo) => {
+    if (estadoNuevo === estadoActual) return false;
+    if (estadoNuevo === "Cancelado") {
+        return estadoActual !== "Entregado" && estadoActual !== "Cancelado";
+    }
+    return siguienteEstadoPedido(estadoActual) === estadoNuevo;
+};
+
+/**
+ * Valida que haya stock suficiente para cada ítem de un pedido.
+ * @param {Array<{productId:string, cantidad:number}>} items
+ * @param {Record<string, any>} productosMap - Mapa productId -> producto (con .stock y .nombre)
+ * @param {Record<string, number>} [stockReservadoExtra] - Stock a "devolver" antes de validar
+ *        (usado al editar un pedido que ya descontó stock, para no bloquear al mismo pedido)
+ */
+const validarStockDisponible = (items, productosMap, stockReservadoExtra = {}) => {
+    for (const it of items) {
+        const prod = productosMap[it.productId];
+        if (!prod) {
+            throw new Error("Uno de los productos del pedido ya no existe.");
+        }
+        const cantidadPedida = Number(it.cantidad) || 0;
+        const stockDisponible =
+            (Number(prod.stock) || 0) + (Number(stockReservadoExtra[it.productId]) || 0);
+
+        if (cantidadPedida > stockDisponible) {
+            throw new Error(
+                `Stock insuficiente para "${prod.nombre}". Disponible: ${stockDisponible}, solicitado: ${cantidadPedida}.`,
+            );
+        }
+    }
+};
+
+/**
  * Crea un pedido en Firestore y genera su factura automáticamente.
  * Si el método de pago es transferencia, la factura se aprueba automáticamente.
+ * Lanza un error si algún producto no tiene stock suficiente para la cantidad pedida.
  */
 export const crearPedidoConFactura = async (pedidoData, productosMap) => {
     ensureDb();
+
+    const items = pedidoData.items || [];
+
+    // No permitir registrar pedidos con más cantidad de la que hay en stock
+    validarStockDisponible(items, productosMap);
 
     const numero = await getNextPedidoNumber();
     const fecha = new Date().toISOString();
 
     // Calcular total
-    const items = pedidoData.items || [];
     const total = items.reduce((sum, it) => {
         const prod = productosMap[it.productId];
         return sum + (prod?.precio || 0) * (Number(it.cantidad) || 0);
@@ -220,6 +280,15 @@ export const changeOrderStatus = async (orderId, newStatus, extraData = {}) => {
         const order = orderSnap.data();
         const prevStatus = order.estado || null;
         const items = order.items || [];
+
+        // El estado del pedido solo puede avanzar un paso a la vez
+        // (Preparando -> Empacado -> A domicilio -> Entregado), sin retrocesos
+        // ni saltos. "Cancelado" es la única excepción permitida.
+        if (!esTransicionEstadoValida(prevStatus, newStatus)) {
+            throw new Error(
+                `No se puede cambiar el estado de "${prevStatus}" a "${newStatus}". El estado del pedido solo puede avanzar al siguiente paso del flujo (${ESTADOS_FLUJO_PEDIDO.join(" → ")}), o cancelarse.`,
+            );
+        }
 
         // Decrease stock when moving to Empacado (only once)
         if (newStatus === "Empacado" && prevStatus !== "Empacado") {
@@ -284,6 +353,58 @@ export const changeOrderStatus = async (orderId, newStatus, extraData = {}) => {
         } catch (e) {
             console.warn("No se pudo actualizar factura:", e);
         }
+    }
+};
+
+/**
+ * Actualiza un pedido existente desde el formulario de edición.
+ * - Valida que la nueva cantidad no exceda el stock disponible (sumando de
+ *   vuelta el stock que el propio pedido ya tenía reservado, si aplica).
+ * - Si el estado cambia, delega en changeOrderStatus para respetar el flujo
+ *   lineal, el historial y los movimientos de stock/factura asociados.
+ * - Los demás campos (cliente, items, notas, método de pago) se actualizan
+ *   directamente, ya que no afectan el flujo de estados.
+ *
+ * @param {string} pedidoId
+ * @param {object} pedidoActual - El documento del pedido tal como está hoy en Firestore
+ * @param {object} cambios - { clienteId, items, notas, metodoPago, estado }
+ * @param {Record<string, any>} productosMap - Mapa productId -> producto
+ * @param {object} [extraData] - Datos adicionales para el cambio de estado (ej. fotoEntrega)
+ */
+export const editarPedido = async (pedidoId, pedidoActual, cambios, productosMap, extraData = {}) => {
+    ensureDb();
+
+    const items = cambios.items || [];
+    const estadoActual = pedidoActual.estado;
+    const estadoNuevo = cambios.estado;
+    const yaDescontoStock = ["Empacado", "A domicilio", "Entregado"].includes(estadoActual);
+
+    // Si el pedido ya descontó stock (llegó a "Empacado" o más adelante) y el
+    // producto no cambió, esa cantidad reservada se suma de vuelta al validar,
+    // para no bloquear la edición del mismo pedido por su propio stock reservado.
+    const stockReservadoExtra = {};
+    if (yaDescontoStock) {
+        for (const it of pedidoActual.items || []) {
+            stockReservadoExtra[it.productId] =
+                (stockReservadoExtra[it.productId] || 0) + (Number(it.cantidad) || 0);
+        }
+    }
+
+    validarStockDisponible(items, productosMap, stockReservadoExtra);
+
+    // Actualizar campos que no son el estado
+    const updates = {
+        clienteId: cambios.clienteId,
+        items,
+        notas: cambios.notas,
+        metodoPago: cambios.metodoPago,
+    };
+    await updateDocument("pedidos", pedidoId, updates);
+
+    // Si el estado cambió, delega el cambio a changeOrderStatus para que
+    // aplique la validación de flujo lineal, historial y stock/factura.
+    if (estadoNuevo && estadoNuevo !== estadoActual) {
+        await changeOrderStatus(pedidoId, estadoNuevo, extraData);
     }
 };
 

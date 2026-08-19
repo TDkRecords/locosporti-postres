@@ -8,7 +8,7 @@
     <button
         type="button"
         onclick={onClose}
-        class="flex w-full items-center justify-center gap-2 bg-[#CDB9FE] py-2 text-sm font-semibold uppercase text-gray-800 transition-colors ease-in-out hover:bg-[#bfa3fd]"
+        class="flex w-full items-center justify-center gap-2 bg-[#CDB9FE] py-2 text-sm font-semibold uppercase text-gray-800 transition-colors ease-in-out hover:bg-[#bfa3fd] cursor-pointer"
     >
         <i class="fa-solid fa-arrow-left-long"></i>
         <p>Volver a productos</p>

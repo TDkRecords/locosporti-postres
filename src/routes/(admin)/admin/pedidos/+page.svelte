@@ -4,21 +4,19 @@
     import DetailPedido from "./components/DetailPedido.svelte";
     import FormPedido from "./components/FormPedido.svelte";
     import DeletePedido from "./components/DeletePedido.svelte";
-    import ConfirmEntrega from "./components/ConfirmEntrega.svelte";
     import {
         watchCollection,
-        updateDocument,
         crearPedidoConFactura,
         changeOrderStatus,
+        editarPedido,
     } from "$lib/firestore.js";
 
     let showForm = $state(false);
     let showDelete = $state(false);
-    let showConfirmEntrega = $state(false);
     let editingPedido = $state(null);
     let pedidoToDelete = $state(null);
-    let pedidoToConfirm = $state(null);
     let selectedPedidoId = $state(null); // ID del pedido abierto en el detalle
+    let errorPedido = $state("");
 
     let productos = $state([]);
     let clientes = $state([]);
@@ -172,45 +170,53 @@
     }
 
     async function agregarPedido(payload) {
+        errorPedido = "";
+        const productosMap = getProductosMap();
+        const items = [
+            {
+                productId: payload.productoId,
+                cantidad: payload.cantidad,
+            },
+        ];
+
         try {
             if (editingPedido && editingPedido.id) {
-                // Actualizar pedido existente
-                const updates = {
-                    clienteId: payload.clienteId,
-                    items: [
-                        {
-                            productId: payload.productoId,
-                            cantidad: payload.cantidad,
-                        },
-                    ],
-                    notas: payload.notas,
-                    metodoPago: payload.metodoPago,
-                    estado: payload.estado,
-                };
-                await updateDocument("pedidos", editingPedido.id, updates);
-            } else {
-                // Crear nuevo pedido + factura automáticamente
-                const productosMap = getProductosMap();
-                await crearPedidoConFactura(
+                // Actualizar pedido existente. El cambio de estado (si lo hay)
+                // se valida y aplica de forma lineal dentro de editarPedido.
+                await editarPedido(
+                    editingPedido.id,
+                    editingPedido,
                     {
                         clienteId: payload.clienteId,
-                        items: [
-                            {
-                                productId: payload.productoId,
-                                cantidad: payload.cantidad,
-                            },
-                        ],
+                        items,
                         notas: payload.notas,
                         metodoPago: payload.metodoPago,
                         estado: payload.estado,
                     },
                     productosMap,
+                    payload.fotoEntrega
+                        ? { fotoEntrega: payload.fotoEntrega }
+                        : {},
+                );
+            } else {
+                // Crear nuevo pedido + factura automáticamente.
+                // Siempre inicia en "Preparando"; se valida que haya stock suficiente.
+                await crearPedidoConFactura(
+                    {
+                        clienteId: payload.clienteId,
+                        items,
+                        notas: payload.notas,
+                        metodoPago: payload.metodoPago,
+                        estado: "Preparando",
+                    },
+                    productosMap,
                 );
             }
+            closeForm();
         } catch (err) {
             console.error("Error guardando pedido:", err);
-        } finally {
-            closeForm();
+            errorPedido = err?.message || "No se pudo guardar el pedido.";
+            alert(errorPedido);
         }
     }
 
@@ -224,37 +230,6 @@
             console.error("Error cancelando pedido:", err);
         } finally {
             closeDelete();
-        }
-    }
-
-    async function changeStatus(pedido, status, eventTarget) {
-        if (!status || status === pedido.estado) return;
-
-        if (status === "Entregado") {
-            if (eventTarget) eventTarget.value = ""; // revert visual selection
-            pedidoToConfirm = pedido;
-            showConfirmEntrega = true;
-            return;
-        }
-
-        try {
-            await changeOrderStatus(pedido.id, status);
-        } catch (err) {
-            console.error("Error cambiando estado:", err);
-        }
-    }
-
-    async function handleConfirmEntrega(url) {
-        if (!pedidoToConfirm) return;
-        try {
-            await changeOrderStatus(pedidoToConfirm.id, "Entregado", {
-                fotoEntrega: url,
-            });
-        } catch (err) {
-            console.error("Error confirmando entrega:", err);
-        } finally {
-            showConfirmEntrega = false;
-            pedidoToConfirm = null;
         }
     }
 
@@ -457,15 +432,6 @@
     onConfirm={softDeletePedido}
 />
 
-<ConfirmEntrega
-    bind:open={showConfirmEntrega}
-    pedido={pedidoToConfirm}
-    onConfirm={handleConfirmEntrega}
-    onCancel={() => {
-        pedidoToConfirm = null;
-    }}
-/>
-
 <!-- Detail -->
 {#if selectedPedido}
     <div
@@ -487,7 +453,6 @@
                 onClose={closeDetail}
                 onEdit={openEdit}
                 onCancel={openDelete}
-                onChangeStatus={changeStatus}
             />
         </div>
     </div>

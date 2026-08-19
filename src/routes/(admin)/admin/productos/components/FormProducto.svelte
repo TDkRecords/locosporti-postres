@@ -117,7 +117,7 @@
                 >
                     <button
                         type="button"
-                        class="flex items-center gap-2 self-start rounded-2xl bg-[#CDB9FE] px-4 py-2 text-sm font-semibold text-gray-800"
+                        class="flex items-center gap-2 self-start rounded-2xl bg-[#CDB9FE] px-4 py-2 text-sm font-semibold text-gray-800 w-full cursor-pointer"
                         onclick={close}
                     >
                         <i class="fa-solid fa-arrow-left-long"></i>
