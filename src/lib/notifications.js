@@ -15,6 +15,7 @@ export async function initPushNotifications(uid) {
         try {
             await setDoc(doc(db, 'clientes', uid), { uid, fcmTokens: arrayUnion(token.value) }, { merge: true });
             await FCM.subscribeTo({ topic: 'nuevos_productos' });
+            await FCM.subscribeTo({ topic: 'fidelidad' });
         } catch (e) {
             console.warn('No se pudo registrar el token de push:', e);
         }

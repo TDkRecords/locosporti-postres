@@ -67,6 +67,20 @@ export async function POST({ request }) {
             });
             break;
 
+        case 'pedido_asignado': {
+            const tokens = await tokensDeCliente(payload.clienteId);
+            if (tokens.length) {
+                await messaging.sendEachForMulticast({
+                    tokens,
+                    notification: {
+                        title: '¡Tienes un pedido nuevo! 📦',
+                        body: `Pedido #${payload.numero} ya está en preparación`,
+                    },
+                });
+            }
+            break;
+        }
+
         case 'pedido_estado': {
             const tokens = await tokensDeCliente(payload.clienteId);
             if (tokens.length) {
@@ -77,6 +91,16 @@ export async function POST({ request }) {
             }
             break;
         }
+
+        case 'meta_creada':
+            await messaging.send({
+                topic: 'fidelidad',
+                notification: {
+                    title: '¡Nueva meta de fidelidad! 🎯',
+                    body: `${payload.titulo} — junta ${payload.cantidad} productos`,
+                },
+            });
+            break;
 
         case 'fidelidad': {
             const tokens = await tokensDeCliente(payload.clienteId);

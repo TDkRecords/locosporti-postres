@@ -268,6 +268,11 @@ export const crearPedidoConFactura = async (pedidoData, productosMap) => {
 
     await addDoc(collectionRef("facturas"), facturaRecord);
 
+    enviarNotificacion('pedido_asignado', {
+        clienteId: pedidoData.clienteId,
+        numero,
+    }).catch(() => { });
+
     return { id: pedidoId, ...pedidoRecord };
 };
 
@@ -368,11 +373,15 @@ export const changeOrderStatus = async (orderId, newStatus, extraData = {}) => {
     if (newStatus === "Entregado") {
         try {
             const orderSnap2 = await getDoc(orderRef);
-            if (orderSnap2.exists() && orderSnap2.data().metodoPago === "contra_entrega") {
-                const q = query(collectionRef("facturas"), where("pedidoId", "==", orderId));
-                const snap = await getDocs(q);
-                for (const d of snap.docs) {
-                    await updateDoc(d.ref, { estado: "pendiente_pago" });
+            if (orderSnap2.exists()) {
+                await verificarMetasAlcanzadas(orderSnap2.data().clienteId, orderId); // 👈 nuevo
+
+                if (orderSnap2.data().metodoPago === "contra_entrega") {
+                    const q = query(collectionRef("facturas"), where("pedidoId", "==", orderId));
+                    const snap = await getDocs(q);
+                    for (const d of snap.docs) {
+                        await updateDoc(d.ref, { estado: "pendiente_pago" });
+                    }
                 }
             }
         } catch (e) {
@@ -436,16 +445,27 @@ export const editarPedido = async (pedidoId, pedidoActual, cambios, productosMap
 export const adjustProductStock = async (productId, delta) => {
     ensureDb();
     const prodRef = doc(db, "productos", productId);
+    let volvioDisponible = false;
+    let nombreProducto = "";
+
     await runTransaction(db, async (transaction) => {
         const snap = await transaction.get(prodRef);
         if (!snap.exists()) throw new Error("Producto no encontrado");
         const current = Number(snap.data().stock) || 0;
         const next = current + Number(delta || 0);
         transaction.update(prodRef, { stock: next });
-        if (next <= 0) transaction.update(prodRef, { estado: "agotado" });
-        else if (snap.data().estado === "agotado" && next > 0)
+        if (next <= 0) {
+            transaction.update(prodRef, { estado: "agotado" });
+        } else if (snap.data().estado === "agotado" && next > 0) {
             transaction.update(prodRef, { estado: "disponible" });
+            volvioDisponible = true;
+            nombreProducto = snap.data().nombre;
+        }
     });
+
+    if (volvioDisponible) {
+        enviarNotificacion('stock_recuperado', { nombre: nombreProducto }).catch(() => { });
+    }
 };
 
 // ─── Egresos ─────────────────────────────────────────────────────────────────
@@ -490,6 +510,12 @@ export const saveMeta = async (metaData) => {
         fecha: new Date().toISOString(),
     };
     const ref = await addDoc(collectionRef("metas"), record);
+
+    enviarNotificacion('meta_creada', {
+        titulo: record.titulo,
+        cantidad: record.meta,
+    }).catch(() => { });
+
     return { id: ref.id, ...record };
 };
 
@@ -511,3 +537,55 @@ export const eliminarMeta = async (id, clientesAlcanzaron = []) => {
     // Marcar como inactiva
     await updateDoc(metaRef, { activa: false });
 };
+
+const contarProductosPedido = (pedido) =>
+    (pedido.items || []).reduce((sum, it) => sum + (Number(it.cantidad) || 0), 0);
+
+const dentroDeVentanaMeta = (pedido, meta) => {
+    const fechaPedido = pedido.fecha ? new Date(pedido.fecha) : null;
+    if (!fechaPedido) return false;
+    const inicio = meta.fecha ? new Date(meta.fecha) : null;
+    const fin = meta.caducidad ? new Date(meta.caducidad) : null;
+    if (inicio && fechaPedido < inicio) return false;
+    if (fin && fechaPedido > fin) return false;
+    return true;
+};
+
+async function verificarMetasAlcanzadas(clienteId, pedidoIdReciente) {
+    try {
+        const metasSnap = await getDocs(
+            query(collectionRef("metas"), where("activa", "==", true)),
+        );
+        if (metasSnap.empty) return;
+
+        const pedidosSnap = await getDocs(
+            query(
+                collectionRef("pedidos"),
+                where("clienteId", "==", clienteId),
+                where("estado", "==", "Entregado"),
+            ),
+        );
+        const entregados = pedidosSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+        for (const metaDoc of metasSnap.docs) {
+            const meta = { id: metaDoc.id, ...metaDoc.data() };
+
+            const totalAntes = entregados
+                .filter((p) => p.id !== pedidoIdReciente && dentroDeVentanaMeta(p, meta))
+                .reduce((sum, p) => sum + contarProductosPedido(p), 0);
+
+            const totalAhora = entregados
+                .filter((p) => dentroDeVentanaMeta(p, meta))
+                .reduce((sum, p) => sum + contarProductosPedido(p), 0);
+
+            if (totalAntes < meta.meta && totalAhora >= meta.meta) {
+                await enviarNotificacion('fidelidad', {
+                    clienteId,
+                    metaNombre: meta.titulo,
+                });
+            }
+        }
+    } catch (e) {
+        console.warn("No se pudo verificar metas de fidelidad:", e);
+    }
+}
