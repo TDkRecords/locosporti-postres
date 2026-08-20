@@ -9,6 +9,7 @@
         saveDocument,
         updateDocument,
     } from "$lib/firestore.js";
+    import { enviarNotificacion } from "$lib/notify.js";
 
     let showForm = $state(false);
     let showDelete = $state(false);
@@ -135,6 +136,10 @@
                   };
 
             const saved = await saveDocument("productos", record);
+            if (!record.id) {
+                enviarNotificacion("nuevo_producto", { nombre: saved.nombre });
+            }
+
             const normalized = normalizeProduct(saved);
 
             if (editingProduct) {

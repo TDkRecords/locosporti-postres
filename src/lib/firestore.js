@@ -15,6 +15,8 @@ import {
     limit,
 } from "firebase/firestore";
 
+import { enviarNotificacion } from "$lib/notify.js";
+
 const ensureDb = () => {
     if (!db) {
         throw new Error("Firestore no está inicializado. Ejecuta la app en el navegador y asegúrate de que Firebase esté configurado.");
@@ -272,6 +274,7 @@ export const crearPedidoConFactura = async (pedidoData, productosMap) => {
 export const changeOrderStatus = async (orderId, newStatus, extraData = {}) => {
     ensureDb();
     const orderRef = doc(db, "pedidos", orderId);
+    let productosConStockRecuperado = []; // 👈
 
     await runTransaction(db, async (transaction) => {
         const orderSnap = await transaction.get(orderRef);
@@ -311,8 +314,13 @@ export const changeOrderStatus = async (orderId, newStatus, extraData = {}) => {
                 const currentStock = Number(prodSnap.data().stock) || 0;
                 const newStock = currentStock + (Number(it.cantidad) || 0);
                 transaction.update(prodRef, { stock: newStock });
-                if (newStock > 0 && prodSnap.data().estado === "agotado")
+                if (newStock > 0 && prodSnap.data().estado === "agotado") {
                     transaction.update(prodRef, { estado: "disponible" });
+                    productosConStockRecuperado.push({
+                        id: it.productId,
+                        nombre: prodSnap.data().nombre,
+                    });
+                }
             }
         }
 
@@ -324,7 +332,24 @@ export const changeOrderStatus = async (orderId, newStatus, extraData = {}) => {
         if (extraData.fotoEntrega) updates.fotoEntrega = extraData.fotoEntrega;
 
         transaction.update(orderRef, updates);
+        transaction._clienteId = order.clienteId;
     });
+
+    try {
+        const orderSnap = await getDoc(orderRef);
+        if (orderSnap.exists()) {
+            await enviarNotificacion('pedido_estado', {
+                clienteId: orderSnap.data().clienteId,
+                estado: newStatus,
+            });
+        }
+
+        for (const prod of productosConStockRecuperado) {
+            await enviarNotificacion('stock_recuperado', { nombre: prod.nombre });
+        }
+    } catch (e) {
+        console.warn("No se pudo enviar la notificación push:", e);
+    }
 
     // Sync factura state when order is cancelled
     if (newStatus === "Cancelado") {

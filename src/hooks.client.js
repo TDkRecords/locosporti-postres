@@ -2,6 +2,7 @@ import { browser } from "$app/environment";
 import { ensureGoogleAuthInitialized, onAuthStateChangedFirebase } from "$lib/firebase.js";
 import { getClienteProfile } from "$lib/firestore.js";
 import { currentUser, clientProfile } from "$lib/stores.js";
+import { initPushNotifications } from "$lib/notifications.js";
 
 if (browser) {
     ensureGoogleAuthInitialized();
@@ -23,5 +24,7 @@ if (browser) {
             console.error("Error cargando perfil del cliente:", error);
             clientProfile.set(null);
         }
+
+        initPushNotifications(user.uid).catch(console.error);
     });
 }
