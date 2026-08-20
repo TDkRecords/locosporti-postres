@@ -10,6 +10,12 @@ import {
     FIREBASE_ADMIN_PROJECT_ID
 } from '$env/static/private';
 
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*', // o restringe a tu origen real si prefieres
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
 if (!getApps().length) {
     initializeApp({
         credential: cert({
@@ -22,6 +28,10 @@ if (!getApps().length) {
 
 const messaging = getMessaging();
 const db = getFirestore();
+
+export async function OPTIONS() {
+    return new Response(null, { headers: corsHeaders });
+}
 
 export async function POST({ request }) {
     const authHeader = request.headers.get('authorization') || '';
@@ -83,7 +93,7 @@ export async function POST({ request }) {
             return json({ error: 'Tipo desconocido' }, { status: 400 });
     }
 
-    return json({ ok: true });
+    return json({ ok: true }, { headers: corsHeaders });
 }
 
 async function tokensDeCliente(clienteId) {
