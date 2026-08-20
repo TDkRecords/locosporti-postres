@@ -41,13 +41,13 @@ export async function POST({ request }) {
     try {
         decoded = await getAuth().verifyIdToken(idToken);
     } catch {
-        return json({ error: 'No autorizado' }, { status: 401 });
+        return json({ error: 'No autorizado' }, { status: 401, headers: corsHeaders });
     }
 
     // solo el/los admin(es) pueden disparar notificaciones
     const adminSnap = await db.doc(`admins/${decoded.uid}`).get();
     if (!adminSnap.exists) {
-        return json({ error: 'No autorizado' }, { status: 403 });
+        return json({ error: 'No autorizado' }, { status: 403, headers: corsHeaders });
     }
 
     const { tipo, payload } = await request.json();
@@ -90,7 +90,7 @@ export async function POST({ request }) {
         }
 
         default:
-            return json({ error: 'Tipo desconocido' }, { status: 400 });
+            return json({ error: 'Tipo desconocido' }, { status: 400, headers: corsHeaders });
     }
 
     return json({ ok: true }, { headers: corsHeaders });
